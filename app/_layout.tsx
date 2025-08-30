@@ -24,6 +24,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    LeagueSpartanExtraBold: require('../assets/fonts/League_Spartan/static/LeagueSpartan-ExtraBold.ttf'),
     ...FontAwesome.font,
   });
 
