@@ -129,10 +129,11 @@ export default function PingHome() {
                         </Text>
                     </View>
                 </View>
-                <View style={styles.footer}>
+                <View className="footer" style={styles.footer}>
                     <Link href="../terms-of-service" style={styles.footerLink}>Terms of Service</Link>
                     <Link href="../support" style={styles.footerLink}>Support</Link>
                     <Link href="../privacy-policy" style={styles.footerLink}>Privacy Policy</Link>
+                    <Link href="../about" style={styles.footerLink}>About</Link>
                 </View>
             </ScrollView>
         </View>

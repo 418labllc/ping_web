@@ -6,6 +6,14 @@ import CustomHeader from '@/components/layout/CustomHeader';
 export default function Layout() {
   return (
     <Tabs screenOptions={{ headerShown: true, tabBarStyle: { backgroundColor: '#323232' }, header: ({ route }) => <CustomHeader title={route.name} />, }}>
+
+      <Tabs.Screen
+        name="activeCall"
+        options={{
+          title: 'Active Call',
+          tabBarIcon: ({ color, size }: any) => <FontAwesome name="qrcode" color={color} size={size} />,
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{

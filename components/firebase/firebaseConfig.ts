@@ -1,0 +1,4 @@
+// firebaseConfig.native.ts
+
+import auth from '@react-native-firebase/auth';
+export { auth };
