@@ -122,6 +122,12 @@ export default function PingHome() {
                             Yes, your request is sent directly to staff or support and is not visible to other guests or users.
                         </Text>
                         <Text style={styles.sectionContent}>
+                            <Ionicons name="help-circle-outline" size={24} color="white" /> Can I chat with staff before they respond to my call?
+                        </Text>
+                        <Text style={styles.sectionContent}>
+                            Yes! After you request help, you can start a chat with staff before they arrive to assist you. This lets you clarify your needs or ask questions in real time.
+                        </Text>
+                        <Text style={styles.sectionContent}>
                             <Ionicons name="help-circle-outline" size={24} color="white" /> Do I need to download an app?
                         </Text>
                         <Text style={styles.sectionContent}>

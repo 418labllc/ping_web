@@ -2,7 +2,6 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import logger from 'redux-logger';
 import authSlice from './reducers/authSlice';
 
-// ...existing code...
 
 const rootReducer = combineReducers({
   auth: authSlice,

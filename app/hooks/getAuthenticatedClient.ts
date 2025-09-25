@@ -1,5 +1,6 @@
+
+import { auth } from '@/components/firebase/firebaseConfig';
 import { GraphQLClient } from 'graphql-request';
-import { auth } from '../firebase/firebaseConfig';
 
 // Use environment variable for endpoint
 const endpoint = !process.env.PRODUCTION ? process.env.EXPO_PUBLIC_API_URL ?? "https://d3i3a627r0j7in.cloudfront.net/graphql" : 'https://d3i3a627r0j7in.cloudfront.net/graphql';

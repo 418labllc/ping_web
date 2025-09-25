@@ -5,7 +5,7 @@ import SignupLoginPageNative from '../../components/auth/SignupLoginPage';
 import { selectAuth } from '../store/reducers/authSlice';
 import SignupLoginPageWeb from '../../components/auth/SignupLoginPage.web';
 import LoadingIndicator from '../../components/common/LoadingIndicator';
-import { useAppSelector } from '@/hooks/redux.hook';
+import { useAppSelector } from '@/app/hooks/redux.hook';
 
 const funBackMessages = [
   "Let’s taco 'bout going back.",

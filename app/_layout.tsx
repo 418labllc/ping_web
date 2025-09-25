@@ -10,6 +10,8 @@ import Head from 'expo-router/head';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Provider } from 'react-redux';
 import { store } from './store';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './utils/queryClient';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -54,15 +56,17 @@ function RootLayoutNav() {
 
   return (
     <Provider store={store}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Head>
-          <title>ping</title>
-        </Head>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Head>
+            <title>ping</title>
+          </Head>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+        </ThemeProvider>
+      </QueryClientProvider>
     </Provider>
   );
 }
