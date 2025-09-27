@@ -94,7 +94,7 @@ const CustomHeader = ({ title }: { title: string }) => {
           dataSet={{ media: ids.logo }}
         />
         <Text style={styles.title} dataSet={{ media: ids.title }}>
-          ping
+          sub
         </Text>
       </View>
       <View style={styles.rightContainer} dataSet={{ media: ids.rightContainer }}>

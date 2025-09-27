@@ -1,28 +1,26 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-    StyleSheet,
     View,
-    Dimensions,
-    FlatList,
     Text,
+    StyleSheet,
+    FlatList,
+    Dimensions,
     TouchableOpacity,
-    StatusBar,
     ActivityIndicator,
 } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import PostSingle from '../../../components/post/PostSingle';
-import type { Post } from '../../../types/post';
 import PostSingleOverlay from '../../../components/post/PostSingleOverlay';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import type { Post } from '../../../types/post';
 
 const { height, width } = Dimensions.get('window');
 
 const VIDEO_A = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
 const VIDEO_B = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4';
 
-const CATEGORIES = ['s/RealEstate', 's/Home', 's/Auto', 's/Electronics', 's/Food'];
+const CATEGORIES = ['RealEstate', 'Home', 'Auto', 'Electronics', 'Food'];
 
-// Map a discoverer handle (like 'thesixtyone') to a list of creator ids used in items
+// Map a discoverer handle to creators (re-using index logic)
 const DISCOVER_MAP: Record<string, string[]> = {
     thesixtyone: ['agent_1', 'agent_5', 'agent_9'],
 };
@@ -35,28 +33,31 @@ function generateItems(startIndex: number, count: number) {
         const uri = useA ? VIDEO_A : VIDEO_B;
         const category = CATEGORIES[idx % CATEGORIES.length];
         items.push({
-            id: `p${idx}`,
+            id: `c${idx}`,
             media: [uri],
-            description: `Auto-generated post #${idx}`,
+            description: `Category post #${idx}`,
             likesCount: Math.floor(Math.random() * 100),
             commentsCount: Math.floor(Math.random() * 20),
             creator: `agent_${idx % 10}`,
-            category,
+            category: `s/${category}`,
             uri,
         });
     }
     return items;
 }
 
-export default function FeedScreen() {
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [activeItem, setActiveItem] = useState<any | null>(null);
-    const [items, setItems] = useState(() => generateItems(1, 12));
+export default function CategoryPage() {
+    const { slug } = useLocalSearchParams();
+    const router = useRouter();
+    const [items, setItems] = useState(() => generateItems(1, 60));
     const [loadingMore, setLoadingMore] = useState(false);
     const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
+    // don't pre-set filterCategory from the slug (case may differ); allow slug-based inclusive filtering below
     const [filterCategory, setFilterCategory] = useState<string | null>(null);
     const [discoverBy, setDiscoverBy] = useState<string | null>(null);
-    const router = useRouter();
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeItem, setActiveItem] = useState<any | null>(null);
+
     const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems && viewableItems.length > 0) {
@@ -65,32 +66,14 @@ export default function FeedScreen() {
         }
     }).current;
 
+    const filtered = items.filter((it) => {
+        if (filterCategory) return it.category === filterCategory;
+        if (discoverBy) return DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false;
+        return String(it.category).toLowerCase().includes(String(slug || '').toLowerCase());
+    });
+
     const renderItem = useCallback(({ item, index }: { item: any; index: number }) => {
         const paused = index !== activeIndex;
-
-        const likes = item.likesCount + (likedMap[item.id] ? 1 : 0);
-
-        const handleLike = () => {
-            setLikedMap((prev) => {
-                const newMap = { ...prev };
-                if (newMap[item.id]) {
-                    delete newMap[item.id];
-                } else {
-                    newMap[item.id] = true;
-                }
-                return newMap;
-            });
-        };
-
-        const handleCategoryPress = () => {
-            // set a client-side filter for now
-            setFilterCategory(item.category);
-        };
-
-        const handleDiscoverBy = (discoverer = 'thesixtyone') => {
-            // Use the discoverer mapping to filter to creators associated with that discoverer
-            setDiscoverBy(discoverer);
-        };
 
         return (
             <View style={{ height, width }}>
@@ -98,44 +81,28 @@ export default function FeedScreen() {
 
                 <View style={styles.categoryBadgeContainer} pointerEvents="box-none">
                     <View style={styles.categoryRow}>
-                        <TouchableOpacity onPress={() => {
-                            // navigate to category page using expo-router dynamic route
-                            const slug = (item.category || '').replace(/^s\//, '').toLowerCase();
-                            router.push({ pathname: '/category/[slug]', params: { slug } });
-                        }} style={styles.categoryBadgeTouchable}>
+                        <TouchableOpacity onPress={() => router.push({ pathname: '/category/[slug]', params: { slug: (item.category || '').replace(/^s\//, '').toLowerCase() } })} style={styles.categoryBadgeTouchable}>
                             <Text style={styles.categoryText}>{item.category}</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => {
-                            // toggle pin filter
-                            setFilterCategory((prev) => (prev === item.category ? null : item.category));
-                        }} style={styles.pinTouch}>
+                        <TouchableOpacity onPress={() => setFilterCategory((prev) => (prev === item.category ? null : item.category))} style={styles.pinTouch}>
                             <Text style={[styles.pinText, filterCategory === item.category && styles.pinActive]}>📌</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* small discover link near badge */}
                 <View style={styles.discoverContainer} pointerEvents="box-none">
-                    <TouchableOpacity onPress={() => handleDiscoverBy('thesixtyone')}>
+                    <TouchableOpacity onPress={() => setDiscoverBy('thesixtyone')}>
                         <Text style={styles.discoverText}>Discovered by thesixtyone</Text>
                     </TouchableOpacity>
                 </View>
             </View>
         );
-    }, [activeIndex, likedMap, router]);
+    }, [activeIndex, router, filterCategory]);
 
     return (
         <View style={styles.container}>
-            <StatusBar hidden />
             <FlatList
-                data={
-                    filterCategory
-                        ? items.filter((it) => it.category === filterCategory)
-                        : discoverBy
-                            ? items.filter((it) => DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false)
-                            : items
-                }
+                data={filtered}
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 pagingEnabled
@@ -148,7 +115,6 @@ export default function FeedScreen() {
                 onEndReached={() => {
                     if (loadingMore) return;
                     setLoadingMore(true);
-                    // simulate async load
                     setTimeout(() => {
                         setItems((prev) => [...prev, ...generateItems(prev.length + 1, 30)]);
                         setLoadingMore(false);
@@ -156,21 +122,13 @@ export default function FeedScreen() {
                 }}
                 onEndReachedThreshold={0.6}
             />
-            {(filterCategory || discoverBy) && (
-                <View style={styles.filterPill}>
-                    <TouchableOpacity onPress={() => { setFilterCategory(null); setDiscoverBy(null); }}>
-                        <Text style={{ color: 'white' }}>Clear filter: {filterCategory ?? discoverBy}</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-            {/* Root-level overlay for active item so it sits above the tab bar */}
+
             {activeItem && (
                 <PostSingleOverlay
                     post={activeItem}
                     likesCount={activeItem.likesCount + (likedMap[activeItem.id] ? 1 : 0)}
                     commentsCount={activeItem.commentsCount}
                     onLikePress={() => {
-                        // reuse same like handler logic
                         setLikedMap((prev) => {
                             const newMap = { ...prev };
                             if (newMap[activeItem.id]) {
@@ -184,42 +142,26 @@ export default function FeedScreen() {
                     onProfilePress={() => router.push({ pathname: '/profile', params: { id: activeItem.creator } })}
                 />
             )}
+
             {loadingMore && (
                 <View style={{ position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center' }}>
                     <ActivityIndicator color="white" />
                 </View>
             )}
-            <View style={styles.topRightContainer}>
-                <TouchableOpacity style={styles.filterButton}>
-                    <Text style={styles.filterText}>Filters</Text>
-                </TouchableOpacity>
-            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'black' },
-    categoryBadge: {
-        position: 'absolute',
-        left: 12,
-        top: 40,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    categoryText: { color: 'white', fontWeight: '600' },
-    topRightContainer: { position: 'absolute', right: 16, top: 40 },
-    filterButton: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 8, borderRadius: 8 },
-    filterText: { color: 'white' },
+    header: { color: 'white', fontSize: 18, padding: 12 },
     categoryBadgeContainer: { position: 'absolute', left: 12, top: 24 },
-    categoryBadgeTouchable: { backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
     categoryRow: { flexDirection: 'row', alignItems: 'center' },
+    categoryBadgeTouchable: { backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+    categoryText: { color: 'white', fontWeight: '600' },
     pinTouch: { marginLeft: 8, padding: 6 },
     pinText: { color: 'white', opacity: 0.8 },
     pinActive: { color: '#ffd700', opacity: 1 },
     discoverContainer: { position: 'absolute', left: 12, top: 74 },
     discoverText: { color: 'white', textDecorationLine: 'underline', fontSize: 12 },
-    filterPill: { position: 'absolute', top: 80, left: 16, backgroundColor: 'rgba(255,255,255,0.06)', padding: 8, borderRadius: 12 },
 });

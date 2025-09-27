@@ -66,16 +66,16 @@ export default function Layout() {
     <Tabs screenOptions={{ headerShown: true, tabBarStyle: { backgroundColor: '#323232' }, header: ({ route }) => <CustomHeader title={route.name} />, }}>
 
       <Tabs.Screen
-        name="activeCall"
+        name="search"
         options={{
-          title: 'Active Call',
+          title: 'Search',
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="qrcode" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Ping',
+          title: 'Home',
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="qrcode" color={color} size={size} />,
         }}
       />
@@ -84,6 +84,13 @@ export default function Layout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="user" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="category/[slug]"
+        options={{
+          title: 'Category',
+          tabBarIcon: ({ color, size }: any) => <FontAwesome name="id-card" color={color} size={size} />,
         }}
       />
     </Tabs>
