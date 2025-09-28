@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>pingrn</string>
-          <string>com.anonymous.pingrn</string>
+          <string>com.418labs.ping</string>
         </array>
       </dict>
     </array>

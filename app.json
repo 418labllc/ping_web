@@ -19,7 +19,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Ping to use your camera to scan QR codes for help."
       },
-      "bundleIdentifier": "com.anonymous.pingrn"
+      "bundleIdentifier": "com.418labs.ping"
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -33,7 +33,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.pingrn"
+      "package": "com.four18labs.ping"
     },
     "web": {
       "bundler": "metro",

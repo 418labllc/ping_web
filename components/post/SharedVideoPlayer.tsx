@@ -1,19 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Text, Platform } from 'react-native';
-import { ResizeMode, Video } from 'expo-av';
-import type { VideoRef } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import type { Post } from '../../types/post';
 
 type Props = {
     paused: boolean;
-    post?: Post & { uri?: string } | null;
+    post: Post & { uri?: string };
     uri?: string;
     tap?: any;
 };
 
-export default function PostSingle({ paused, post, uri }: Props) {
-    const source = uri || post?.media?.[0];
-    const videoRef = useRef<VideoRef | null>(null);
+export default function SharedVideoPlayer({ paused, post, uri }: Props) {
+    const source = uri || (post && post.media && post.media[0]);
+    const videoRef = useRef<any>(null);
 
     useEffect(() => {
         const ref = videoRef.current;
@@ -31,7 +30,7 @@ export default function PostSingle({ paused, post, uri }: Props) {
     const handlePlaybackStatus = (status: any) => {
         // Log playback status for debugging
         // eslint-disable-next-line no-console
-        console.log('playback status', { id: post?.id, paused, status });
+        console.log('shared playback status', { id: post?.id, paused, status });
     };
 
     if (!source) {

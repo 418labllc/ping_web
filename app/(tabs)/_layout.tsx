@@ -66,17 +66,17 @@ export default function Layout() {
     <Tabs screenOptions={{ headerShown: true, tabBarStyle: { backgroundColor: '#323232' }, header: ({ route }) => <CustomHeader title={route.name} />, }}>
 
       <Tabs.Screen
-        name="search"
+        name="search/index"
         options={{
           title: 'Search',
-          tabBarIcon: ({ color, size }: any) => <FontAwesome name="qrcode" color={color} size={size} />,
+          tabBarIcon: ({ color, size }: any) => <FontAwesome name="search" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }: any) => <FontAwesome name="qrcode" color={color} size={size} />,
+          tabBarIcon: ({ color, size }: any) => <FontAwesome name="home" color={color} size={size} />,
         }}
       />
       <Tabs.Screen

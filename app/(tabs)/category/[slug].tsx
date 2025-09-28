@@ -3,14 +3,12 @@ import {
     View,
     Text,
     StyleSheet,
-    FlatList,
     Dimensions,
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import PostSingle from '../../../components/post/PostSingle';
-import PostSingleOverlay from '../../../components/post/PostSingleOverlay';
+import TwoLayerFeed from '../../../components/TwoLayerFeed';
 import type { Post } from '../../../types/post';
 
 const { height, width } = Dimensions.get('window');
@@ -51,68 +49,24 @@ export default function CategoryPage() {
     const router = useRouter();
     const [items, setItems] = useState(() => generateItems(1, 60));
     const [loadingMore, setLoadingMore] = useState(false);
-    const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
+    // likes are tracked on the item objects (items[].liked)
     // don't pre-set filterCategory from the slug (case may differ); allow slug-based inclusive filtering below
     const [filterCategory, setFilterCategory] = useState<string | null>(null);
     const [discoverBy, setDiscoverBy] = useState<string | null>(null);
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [activeItem, setActiveItem] = useState<any | null>(null);
-
-    const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
-    const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-        if (viewableItems && viewableItems.length > 0) {
-            setActiveIndex(viewableItems[0].index);
-            setActiveItem(viewableItems[0].item ?? null);
-        }
-    }).current;
-
     const filtered = items.filter((it) => {
         if (filterCategory) return it.category === filterCategory;
         if (discoverBy) return DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false;
         return String(it.category).toLowerCase().includes(String(slug || '').toLowerCase());
     });
 
-    const renderItem = useCallback(({ item, index }: { item: any; index: number }) => {
-        const paused = index !== activeIndex;
-
-        return (
-            <View style={{ height, width }}>
-                <PostSingle paused={paused} post={item} uri={item.uri} tap={undefined as any} />
-
-                <View style={styles.categoryBadgeContainer} pointerEvents="box-none">
-                    <View style={styles.categoryRow}>
-                        <TouchableOpacity onPress={() => router.push({ pathname: '/category/[slug]', params: { slug: (item.category || '').replace(/^s\//, '').toLowerCase() } })} style={styles.categoryBadgeTouchable}>
-                            <Text style={styles.categoryText}>{item.category}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setFilterCategory((prev) => (prev === item.category ? null : item.category))} style={styles.pinTouch}>
-                            <Text style={[styles.pinText, filterCategory === item.category && styles.pinActive]}>📌</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={styles.discoverContainer} pointerEvents="box-none">
-                    <TouchableOpacity onPress={() => setDiscoverBy('thesixtyone')}>
-                        <Text style={styles.discoverText}>Discovered by thesixtyone</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    }, [activeIndex, router, filterCategory]);
-
     return (
         <View style={styles.container}>
-            <FlatList
-                data={filtered}
-                renderItem={renderItem}
-                keyExtractor={(item) => item.id}
-                pagingEnabled
-                showsVerticalScrollIndicator={false}
-                decelerationRate="fast"
-                snapToInterval={height}
-                snapToAlignment="start"
-                viewabilityConfig={viewabilityConfig}
-                onViewableItemsChanged={onViewableItemsChanged}
-                onEndReached={() => {
+            <TwoLayerFeed
+                items={filtered}
+                setItems={setItems}
+                onProfilePress={(post) => router.push({ pathname: '/profile', params: { id: post.creator } })}
+                onOpenComments={(post) => { /* noop */ }}
+                onReload={() => {
                     if (loadingMore) return;
                     setLoadingMore(true);
                     setTimeout(() => {
@@ -120,28 +74,7 @@ export default function CategoryPage() {
                         setLoadingMore(false);
                     }, 600);
                 }}
-                onEndReachedThreshold={0.6}
             />
-
-            {activeItem && (
-                <PostSingleOverlay
-                    post={activeItem}
-                    likesCount={activeItem.likesCount + (likedMap[activeItem.id] ? 1 : 0)}
-                    commentsCount={activeItem.commentsCount}
-                    onLikePress={() => {
-                        setLikedMap((prev) => {
-                            const newMap = { ...prev };
-                            if (newMap[activeItem.id]) {
-                                delete newMap[activeItem.id];
-                            } else {
-                                newMap[activeItem.id] = true;
-                            }
-                            return newMap;
-                        });
-                    }}
-                    onProfilePress={() => router.push({ pathname: '/profile', params: { id: activeItem.creator } })}
-                />
-            )}
 
             {loadingMore && (
                 <View style={{ position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center' }}>

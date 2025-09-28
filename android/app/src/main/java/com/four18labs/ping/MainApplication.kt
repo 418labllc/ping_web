@@ -1,4 +1,4 @@
-package com.anonymous.pingrn
+package com.four18labs.ping
 
 import android.app.Application
 import android.content.res.Configuration

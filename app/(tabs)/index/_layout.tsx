@@ -16,14 +16,6 @@ function PingLayoutNav() {
           title: 'FAQ',
         }}
       />
-      <Stack.Screen
-        name="camera"
-        options={{
-          presentation: 'modal',
-          animation: 'slide_from_right',
-          title: 'Camera',
-        }}
-      />
     </Stack>
   );
 }

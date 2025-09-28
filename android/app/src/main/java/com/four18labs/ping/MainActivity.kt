@@ -1,4 +1,4 @@
-package com.anonymous.pingrn
+package com.four18labs.ping
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -3,15 +3,13 @@ import {
     StyleSheet,
     View,
     Dimensions,
-    FlatList,
     Text,
     TouchableOpacity,
     StatusBar,
     ActivityIndicator,
 } from 'react-native';
-import PostSingle from '../../../components/post/PostSingle';
+import TwoLayerFeed from '../../../components/TwoLayerFeed';
 import type { Post } from '../../../types/post';
-import PostSingleOverlay from '../../../components/post/PostSingleOverlay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -49,112 +47,42 @@ function generateItems(startIndex: number, count: number) {
 }
 
 export default function FeedScreen() {
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [activeItem, setActiveItem] = useState<any | null>(null);
+
     const [items, setItems] = useState(() => generateItems(1, 12));
     const [loadingMore, setLoadingMore] = useState(false);
-    const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
+    const [activeItem, setActiveItem] = useState<any | null>(null);
+    // track likes on the item objects themselves (items[].liked) so counts update
+    // reliably and re-rendering is straightforward
     const [filterCategory, setFilterCategory] = useState<string | null>(null);
     const [discoverBy, setDiscoverBy] = useState<string | null>(null);
     const router = useRouter();
-    const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
-    const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-        if (viewableItems && viewableItems.length > 0) {
-            setActiveIndex(viewableItems[0].index);
-            setActiveItem(viewableItems[0].item ?? null);
-        }
-    }).current;
+    const item = activeItem;
 
-    const renderItem = useCallback(({ item, index }: { item: any; index: number }) => {
-        const paused = index !== activeIndex;
+    const handleDiscoverBy = (who: string) => {
+        setDiscoverBy(who);
+    };
 
-        const likes = item.likesCount + (likedMap[item.id] ? 1 : 0);
-
-        const handleLike = () => {
-            setLikedMap((prev) => {
-                const newMap = { ...prev };
-                if (newMap[item.id]) {
-                    delete newMap[item.id];
-                } else {
-                    newMap[item.id] = true;
-                }
-                return newMap;
-            });
-        };
-
-        const handleCategoryPress = () => {
-            // set a client-side filter for now
-            setFilterCategory(item.category);
-        };
-
-        const handleDiscoverBy = (discoverer = 'thesixtyone') => {
-            // Use the discoverer mapping to filter to creators associated with that discoverer
-            setDiscoverBy(discoverer);
-        };
-
-        return (
-            <View style={{ height, width }}>
-                <PostSingle paused={paused} post={item} uri={item.uri} tap={undefined as any} />
-
-                <View style={styles.categoryBadgeContainer} pointerEvents="box-none">
-                    <View style={styles.categoryRow}>
-                        <TouchableOpacity onPress={() => {
-                            // navigate to category page using expo-router dynamic route
-                            const slug = (item.category || '').replace(/^s\//, '').toLowerCase();
-                            router.push({ pathname: '/category/[slug]', params: { slug } });
-                        }} style={styles.categoryBadgeTouchable}>
-                            <Text style={styles.categoryText}>{item.category}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => {
-                            // toggle pin filter
-                            setFilterCategory((prev) => (prev === item.category ? null : item.category));
-                        }} style={styles.pinTouch}>
-                            <Text style={[styles.pinText, filterCategory === item.category && styles.pinActive]}>📌</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* small discover link near badge */}
-                <View style={styles.discoverContainer} pointerEvents="box-none">
-                    <TouchableOpacity onPress={() => handleDiscoverBy('thesixtyone')}>
-                        <Text style={styles.discoverText}>Discovered by thesixtyone</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    }, [activeIndex, likedMap, router]);
 
     return (
         <View style={styles.container}>
             <StatusBar hidden />
-            <FlatList
-                data={
-                    filterCategory
-                        ? items.filter((it) => it.category === filterCategory)
-                        : discoverBy
-                            ? items.filter((it) => DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false)
-                            : items
-                }
-                renderItem={renderItem}
-                keyExtractor={(item) => item.id}
-                pagingEnabled
-                showsVerticalScrollIndicator={false}
-                decelerationRate="fast"
-                snapToInterval={height}
-                snapToAlignment="start"
-                viewabilityConfig={viewabilityConfig}
-                onViewableItemsChanged={onViewableItemsChanged}
-                onEndReached={() => {
+            {/* (moved) category badge + discover UI is rendered near the bottom (below) */}
+
+            <TwoLayerFeed
+                items={filterCategory ? items.filter((it) => it.category === filterCategory) : discoverBy ? items.filter((it) => DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false) : items}
+                setItems={setItems}
+                onProfilePress={(post) => router.push({ pathname: '/profile', params: { id: post.creator } })}
+                onOpenComments={(post) => { /* wire to modal if you want */ }}
+                onReload={() => {
                     if (loadingMore) return;
                     setLoadingMore(true);
-                    // simulate async load
                     setTimeout(() => {
                         setItems((prev) => [...prev, ...generateItems(prev.length + 1, 30)]);
                         setLoadingMore(false);
                     }, 600);
                 }}
-                onEndReachedThreshold={0.6}
+                onActiveChange={(post) => setActiveItem(post)}
+                onToggleCategoryFilter={(category) => setFilterCategory(category)}
             />
             {(filterCategory || discoverBy) && (
                 <View style={styles.filterPill}>
@@ -162,32 +90,40 @@ export default function FeedScreen() {
                         <Text style={{ color: 'white' }}>Clear filter: {filterCategory ?? discoverBy}</Text>
                     </TouchableOpacity>
                 </View>
+
+
             )}
-            {/* Root-level overlay for active item so it sits above the tab bar */}
-            {activeItem && (
-                <PostSingleOverlay
-                    post={activeItem}
-                    likesCount={activeItem.likesCount + (likedMap[activeItem.id] ? 1 : 0)}
-                    commentsCount={activeItem.commentsCount}
-                    onLikePress={() => {
-                        // reuse same like handler logic
-                        setLikedMap((prev) => {
-                            const newMap = { ...prev };
-                            if (newMap[activeItem.id]) {
-                                delete newMap[activeItem.id];
-                            } else {
-                                newMap[activeItem.id] = true;
-                            }
-                            return newMap;
-                        });
-                    }}
-                    onProfilePress={() => router.push({ pathname: '/profile', params: { id: activeItem.creator } })}
-                />
-            )}
+            {/* overlays are provided per layer inside TwoLayerFeed */}
+
+            {/* category badge + discover UI (top-left) */}
+            {item ? (
+                <View pointerEvents="box-none">
+                    <View style={styles.categoryBadgeContainer} pointerEvents="box-none">
+                        <View style={styles.categoryRow}>
+                            <TouchableOpacity onPress={() => {
+                                const slug = (item.category || '').replace(/^s\//, '').toLowerCase();
+                                router.push({ pathname: '/category/[slug]', params: { slug } });
+                            }} style={styles.categoryBadgeTouchable}>
+                                <Text style={styles.categoryText}>{item.category}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => setFilterCategory((prev) => (prev === item.category ? null : item.category))} style={styles.pinTouch}>
+                                <Text style={[styles.pinText, filterCategory === item.category && styles.pinActive]}>📌</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={styles.discoverContainer} pointerEvents="box-none">
+                        <Text style={styles.discoverText}>Discovered by thesixtyone</Text>
+                    </View>
+                </View>
+            ) : null}
+
             {loadingMore && (
                 <View style={{ position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center' }}>
                     <ActivityIndicator color="white" />
                 </View>
+
             )}
             <View style={styles.topRightContainer}>
                 <TouchableOpacity style={styles.filterButton}>
