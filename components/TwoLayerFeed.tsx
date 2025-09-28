@@ -24,6 +24,14 @@ type Props = {
 export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB = 1, onProfilePress, onOpenComments, onReload, onActiveChange, onToggleCategoryFilter }: Props) {
     const [playA, setPlayA] = useState<boolean>(true);
     const [paused, setPaused] = useState<boolean>(false);
+    const lastToggleRef = React.useRef<number>(0);
+    const TOGGLE_DEBOUNCE_MS = 300; // milliseconds
+    const togglePaused = () => {
+        const now = Date.now();
+        if (now - lastToggleRef.current < TOGGLE_DEBOUNCE_MS) return;
+        lastToggleRef.current = now;
+        setPaused((p) => !p);
+    };
     const [playIndexObject, setplayIndexObject] = useState<PlayIndexObject>({ a: initialA, b: initialB });
     const router = useRouter();
 
@@ -36,7 +44,8 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
     }, [playIndexObject.a, playIndexObject.b, items, onActiveChange]);
 
     const tap = Gesture.Tap().onStart(() => {
-        runOnJS(setPaused)(p => !p);
+        // use runOnJS to invoke the debounced toggle on the JS thread
+        runOnJS(togglePaused)();
     });
 
     const offseta = useSharedValue(0);
@@ -157,7 +166,7 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
                                     </View>
                                 </View>
                             )}
-                            <PostSingle post={items[playIndexObject.a]} paused={paused || !playA} uri={items[playIndexObject.a]?.uri} tap={tap as any} />
+                            <PostSingle post={items[playIndexObject.a]} paused={paused || !playA} uri={items[playIndexObject.a]?.uri} tap={tap as any} onTogglePause={() => togglePaused()} />
 
                             {items[playIndexObject.a] && (
                                 <PostSingleOverlay
@@ -192,7 +201,7 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
                                     </View>
                                 </View>
                             )}
-                            <PostSingle post={items[playIndexObject.b]} paused={paused || playA} uri={items[playIndexObject.b]?.uri} tap={tap as any} />
+                            <PostSingle post={items[playIndexObject.b]} paused={paused || playA} uri={items[playIndexObject.b]?.uri} tap={tap as any} onTogglePause={() => togglePaused()} />
 
                             {items[playIndexObject.b] && (
                                 <PostSingleOverlay
