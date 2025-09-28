@@ -16,11 +16,11 @@ function generateItems(startIndex: number, count: number) {
       id: `s${idx}`,
       title: `Search result ${idx}`,
       description: `Search result #${idx}`,
-          uri,
-          category: `s/${['RealEstate', 'Home', 'Auto', 'Food'][idx % 4]}`,
-          likesCount: Math.floor(Math.random() * 100),
-          commentsCount: Math.floor(Math.random() * 20),
-          liked: false,
+      uri,
+      category: `s/${['RealEstate', 'Home', 'Auto', 'Food'][idx % 4]}`,
+      likesCount: Math.floor(Math.random() * 100),
+      commentsCount: Math.floor(Math.random() * 20),
+      liked: false,
     });
   }
   return items;

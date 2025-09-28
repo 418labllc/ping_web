@@ -59,7 +59,7 @@ export default function CategoryPage() {
     const setItems = (updater: ((prev: any[]) => any[]) | any[]) => {
         _setItems((prev) => {
             const next = typeof updater === 'function' ? updater(prev) : updater;
-            try { AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) {}
+            try { AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) { }
             return next;
         });
     };
@@ -82,7 +82,7 @@ export default function CategoryPage() {
 
             const initial = generateItems(1, 60);
             _setItems(initial);
-            try { AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initial)); } catch (e) {}
+            try { AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initial)); } catch (e) { }
         })();
         return () => { mounted = false; };
     }, []);

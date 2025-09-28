@@ -49,7 +49,7 @@ function generateItems(startIndex: number, count: number) {
 }
 
 export default function FeedScreen() {
-    
+
     const [items, _setItems] = useState<Array<any>>([]);
     const [loadingMore, setLoadingMore] = useState(false);
     // wrapper that persists to AsyncStorage whenever items change
@@ -88,7 +88,7 @@ export default function FeedScreen() {
             _setItems(initial);
             try {
                 AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-            } catch (e) {}
+            } catch (e) { }
         })();
         return () => { mounted = false; };
     }, []);
