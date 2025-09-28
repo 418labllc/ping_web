@@ -88,8 +88,10 @@ export default function Layout() {
       />
       <Tabs.Screen
         name="category/[slug]"
+
         options={{
-          title: 'Category',
+          href: null,
+          title: 'Subs',
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="id-card" color={color} size={size} />,
         }}
       />

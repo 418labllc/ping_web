@@ -14,6 +14,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './utils/queryClient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -70,6 +71,7 @@ function RootLayoutNav() {
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                   <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
                 </Stack>
+                <Toast />
               </ThemeProvider>
             </QueryClientProvider>
           </Provider>

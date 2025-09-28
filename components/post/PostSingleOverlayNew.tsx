@@ -1,6 +1,9 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
+import { useState } from 'react';
 // This overlay intentionally contains no hooks; actions like opening comments
 // should be passed in via callback props from the consumer.
 import ProfileImage from '../common/ProfileImage';
@@ -9,7 +12,8 @@ import type { Post } from '../../types/post';
 export type PostSingleOverlayPropsNew = {
     post: Post;
     user: any;
-    handleUpdateLike: () => void;
+    // handler accepts an optional delta (number of hearts to add)
+    handleUpdateLike: (delta?: number) => void;
     handleProfleTouch: () => void;
     // currentLikeState: { state: boolean; counter: number }
     currentLikeState: { state: boolean; counter: number };
@@ -26,6 +30,52 @@ const PostSingleOverlayNew = ({
     handleProfleTouch,
     onOpenComments,
 }: PostSingleOverlayPropsNew) => {
+
+    const todayKey = () => {
+        const d = new Date();
+        return `hearts:${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    };
+
+    const [processing, setProcessing] = useState(false);
+
+    const onHeartPress = async () => {
+        // Always add a heart (no unlike). Each heart consumes from daily allowance.
+        const heartsKey = todayKey();
+        if (processing) return;
+        setProcessing(true);
+        try {
+
+            // // prevent multiple hearts on same post today
+            // const already = await AsyncStorage.getItem(postKey);
+            // if (already) {
+            //     Toast.show({ type: 'info', text1: 'You already hearted this post today' });
+            //     setProcessing(false);
+            //     return;
+            // }
+
+            const raw = await AsyncStorage.getItem(heartsKey);
+            const used = raw ? Number(raw) : 0;
+            const MAX = 7;
+            if (used >= MAX) {
+                Toast.show({ type: 'error', text1: 'No hearts left for today' });
+                setProcessing(false);
+                return;
+            }
+
+            const newUsed = used + 1;
+            await AsyncStorage.setItem(heartsKey, String(newUsed));
+            // additive: inform parent to increment likes by 1
+            handleUpdateLike?.(1);
+            Toast.show({ type: 'success', text1: `Heart used (${newUsed}/${MAX})` });
+        } catch (e) {
+            // fallback: still toggle like
+            handleUpdateLike?.(1);
+            Toast.show({ type: 'info', text1: 'Liked' });
+            setProcessing(false);
+            return;
+        }
+        setProcessing(false);
+    };
     return (
         <View style={styles.container} pointerEvents="box-none">
             <View style={styles.left}>
@@ -36,7 +86,7 @@ const PostSingleOverlayNew = ({
                 <Pressable onPress={() => handleProfleTouch()} style={styles.iconWrap}>
                     <ProfileImage photoURL={user?.photoURL} />
                 </Pressable>
-                <Pressable onPress={() => handleUpdateLike()} style={[styles.iconWrap, { marginTop: 14 }]}>
+                <Pressable onPress={onHeartPress} style={[styles.iconWrap, { marginTop: 14 }]}>
                     <Ionicons
                         color="white"
                         size={40}

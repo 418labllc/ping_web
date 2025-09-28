@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import PostSingle from './post/PostSingle';
@@ -22,7 +22,6 @@ type Props = {
 };
 
 export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB = 1, onProfilePress, onOpenComments, onReload, onActiveChange, onToggleCategoryFilter }: Props) {
-    const [feedList] = useState(items);
     const [playA, setPlayA] = useState<boolean>(true);
     const [paused, setPaused] = useState<boolean>(false);
     const [playIndexObject, setplayIndexObject] = useState<PlayIndexObject>({ a: initialA, b: initialB });
@@ -127,11 +126,11 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
     const animatedStylesb = useAnimatedStyle(() => ({ transform: [{ translateY: offsetb.value }], zIndex: bZindex.value, height: '100%' }));
 
     // helpers to update like on parent items array
-    const toggleLikeAt = (index: number) => {
+    const toggleLikeAt = (index: number, delta = 1) => {
         const post = items[index];
         if (!post) return;
         if (setItems) {
-            setItems((prev) => prev.map((it) => (it.id === post.id ? { ...it, liked: !it.liked, likesCount: Math.max(0, it.likesCount + (it.liked ? -1 : 1)) } : it)));
+            setItems((prev) => prev.map((it) => (it.id === post.id ? { ...it, liked: true, likesCount: Math.max(0, (it.likesCount || 0) + delta) } : it)));
         }
     };
 
@@ -146,12 +145,9 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
                                 <View style={{ position: 'absolute', left: 12, top: 24, zIndex: 60 }} pointerEvents="box-none">
                                     <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <TouchableOpacity onPress={() => {
-                                                const slug = (items[playIndexObject.a].category || '').replace(/^s\//, '').toLowerCase();
-                                                router.push({ pathname: '/category/[slug]', params: { slug } });
-                                            }}>
+                                            <Link href={{ pathname: '/category/[slug]', params: { slug: (items[playIndexObject.a].category || '').replace(/^s\//, '').toLowerCase() } }} style={{ textDecorationLine: 'none' }}>
                                                 <Text style={{ color: 'white', fontWeight: '600' }}>{items[playIndexObject.a].category}</Text>
-                                            </TouchableOpacity>
+                                            </Link>
 
                                             <TouchableOpacity onPress={() => onToggleCategoryFilter?.(items[playIndexObject.a].category)} style={{ marginLeft: 8, padding: 6 }}>
                                                 <Text style={{ color: 'white', opacity: 0.8 }}>📌</Text>
@@ -169,7 +165,7 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
                                     user={{ displayName: 'User', photoURL: undefined }}
                                     currentLikeState={{ state: !!items[playIndexObject.a].liked, counter: items[playIndexObject.a].likesCount }}
                                     commentsCount={items[playIndexObject.a].commentsCount}
-                                    handleUpdateLike={() => toggleLikeAt(playIndexObject.a)}
+                                    handleUpdateLike={(delta = 1) => toggleLikeAt(playIndexObject.a, delta)}
                                     handleProfleTouch={() => onProfilePress?.(items[playIndexObject.a])}
                                     onOpenComments={() => onOpenComments?.(items[playIndexObject.a])}
                                 />
@@ -184,12 +180,9 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
                                 <View style={{ position: 'absolute', left: 12, top: 24, zIndex: 60 }} pointerEvents="box-none">
                                     <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <TouchableOpacity onPress={() => {
-                                                const slug = (items[playIndexObject.b].category || '').replace(/^s\//, '').toLowerCase();
-                                                router.push({ pathname: '/category/[slug]', params: { slug } });
-                                            }}>
+                                            <Link href={{ pathname: '/category/[slug]', params: { slug: (items[playIndexObject.b].category || '').replace(/^s\//, '').toLowerCase() } }} style={{ textDecorationLine: 'none' }}>
                                                 <Text style={{ color: 'white', fontWeight: '600' }}>{items[playIndexObject.b].category}</Text>
-                                            </TouchableOpacity>
+                                            </Link>
 
                                             <TouchableOpacity onPress={() => onToggleCategoryFilter?.(items[playIndexObject.b].category)} style={{ marginLeft: 8, padding: 6 }}>
                                                 <Text style={{ color: 'white', opacity: 0.8 }}>📌</Text>
@@ -207,7 +200,7 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
                                     user={{ displayName: 'User', photoURL: undefined }}
                                     currentLikeState={{ state: !!items[playIndexObject.b].liked, counter: items[playIndexObject.b].likesCount }}
                                     commentsCount={items[playIndexObject.b].commentsCount}
-                                    handleUpdateLike={() => toggleLikeAt(playIndexObject.b)}
+                                    handleUpdateLike={(delta = 1) => toggleLikeAt(playIndexObject.b, delta)}
                                     handleProfleTouch={() => onProfilePress?.(items[playIndexObject.b])}
                                     onOpenComments={() => onOpenComments?.(items[playIndexObject.b])}
                                 />

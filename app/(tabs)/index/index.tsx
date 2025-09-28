@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
     StyleSheet,
     View,
@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import TwoLayerFeed from '../../../components/TwoLayerFeed';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Post } from '../../../types/post';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -38,6 +39,7 @@ function generateItems(startIndex: number, count: number) {
             description: `Auto-generated post #${idx}`,
             likesCount: Math.floor(Math.random() * 100),
             commentsCount: Math.floor(Math.random() * 20),
+            liked: false,
             creator: `agent_${idx % 10}`,
             category,
             uri,
@@ -47,9 +49,49 @@ function generateItems(startIndex: number, count: number) {
 }
 
 export default function FeedScreen() {
-
-    const [items, setItems] = useState(() => generateItems(1, 12));
+    
+    const [items, _setItems] = useState<Array<any>>([]);
     const [loadingMore, setLoadingMore] = useState(false);
+    // wrapper that persists to AsyncStorage whenever items change
+    const STORAGE_KEY = 'feed:items';
+
+    const setItems = (updater: ((prev: any[]) => any[]) | any[]) => {
+        _setItems((prev) => {
+            const next = typeof updater === 'function' ? updater(prev) : updater;
+            try {
+                AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            } catch (e) {
+                // ignore storage errors
+            }
+            return next;
+        });
+    };
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const raw = await AsyncStorage.getItem(STORAGE_KEY);
+                if (raw && mounted) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        _setItems(parsed);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            // no stored items, generate defaults and persist
+            const initial = generateItems(1, 12);
+            _setItems(initial);
+            try {
+                AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+            } catch (e) {}
+        })();
+        return () => { mounted = false; };
+    }, []);
     const [activeItem, setActiveItem] = useState<any | null>(null);
     // track likes on the item objects themselves (items[].liked) so counts update
     // reliably and re-rendering is straightforward

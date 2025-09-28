@@ -5,6 +5,8 @@ export type Post = {
     likesCount?: number;
     commentsCount?: number;
     creator?: string;
+    // local client state
+    liked?: boolean;
 };
 
 export type Sub = { id: string; title?: string };

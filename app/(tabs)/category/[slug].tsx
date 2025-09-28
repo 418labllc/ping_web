@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,7 +8,9 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TwoLayerFeed from '../../../components/TwoLayerFeed';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Post } from '../../../types/post';
 
 const { height, width } = Dimensions.get('window');
@@ -36,6 +38,7 @@ function generateItems(startIndex: number, count: number) {
             description: `Category post #${idx}`,
             likesCount: Math.floor(Math.random() * 100),
             commentsCount: Math.floor(Math.random() * 20),
+            liked: false,
             creator: `agent_${idx % 10}`,
             category: `s/${category}`,
             uri,
@@ -47,8 +50,42 @@ function generateItems(startIndex: number, count: number) {
 export default function CategoryPage() {
     const { slug } = useLocalSearchParams();
     const router = useRouter();
-    const [items, setItems] = useState(() => generateItems(1, 60));
+    const insets = useSafeAreaInsets();
+    const [items, _setItems] = useState<Array<any>>([]);
     const [loadingMore, setLoadingMore] = useState(false);
+    const STORAGE_KEY = 'feed:items';
+
+    // persist wrapper so updates (likes/hearts) are saved and shared with main feed
+    const setItems = (updater: ((prev: any[]) => any[]) | any[]) => {
+        _setItems((prev) => {
+            const next = typeof updater === 'function' ? updater(prev) : updater;
+            try { AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) {}
+            return next;
+        });
+    };
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const raw = await AsyncStorage.getItem(STORAGE_KEY);
+                if (raw && mounted) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        _setItems(parsed);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            const initial = generateItems(1, 60);
+            _setItems(initial);
+            try { AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initial)); } catch (e) {}
+        })();
+        return () => { mounted = false; };
+    }, []);
     // likes are tracked on the item objects (items[].liked)
     // don't pre-set filterCategory from the slug (case may differ); allow slug-based inclusive filtering below
     const [filterCategory, setFilterCategory] = useState<string | null>(null);
@@ -61,6 +98,12 @@ export default function CategoryPage() {
 
     return (
         <View style={styles.container}>
+            {/* back button */}
+            <View style={{ position: 'absolute', left: 12, top: (insets.top || 24), zIndex: 200 }}>
+                <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8 }}>
+                    <Text style={{ color: 'white', fontSize: 16 }}>{'←'}</Text>
+                </TouchableOpacity>
+            </View>
             <TwoLayerFeed
                 items={filtered}
                 setItems={setItems}

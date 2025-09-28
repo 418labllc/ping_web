@@ -55,6 +55,18 @@ export default function ProfileScreen() {
       <Text style={styles.title}>Profile</Text>
 
       <View style={styles.card}>
+        <Text style={styles.label}>Level</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: 18, fontWeight: '700' }}>Level 20</Text>
+          <Text style={{ color: '#666' }}>26</Text>
+        </View>
+        <View style={styles.progressWrap}>
+          <View style={[styles.progressBar, { width: `${(20 / 26) * 100}%` }]} />
+        </View>
+        <Text style={styles.small}>Progress: 20 / 26</Text>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.label}>Daily Hearts</Text>
         <Text style={styles.value}>{heartsLeft} / {HEARTS_PER_DAY}</Text>
         <Text style={styles.small}>Used today: {used}</Text>
@@ -80,6 +92,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff', alignItems: 'center' },
   title: { fontSize: 24, marginTop: 12, marginBottom: 12 },
   card: { width: '100%', backgroundColor: '#f6f6f6', padding: 16, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
+  progressWrap: { width: '100%', height: 12, backgroundColor: 'black', borderRadius: 0, marginTop: 10, overflow: 'hidden', borderWidth: 2, borderColor: 'black' },
+  progressBar: { height: '100%', backgroundColor: 'white' },
   label: { fontSize: 14, color: '#666' },
   value: { fontSize: 32, fontWeight: '700', marginTop: 6 },
   small: { fontSize: 12, color: '#888', marginTop: 4 },
