@@ -7,7 +7,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TwoLayerFeed from '../../../components/TwoLayerFeed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,7 +48,7 @@ function generateItems(startIndex: number, count: number) {
 }
 
 export default function CategoryPage() {
-    const { slug } = useLocalSearchParams();
+    const { slug, activeId: incomingActiveId } = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [items, _setItems] = useState<Array<any>>([]);
@@ -96,17 +96,31 @@ export default function CategoryPage() {
         return String(it.category).toLowerCase().includes(String(slug || '').toLowerCase());
     });
 
+    const [activeId, setActiveId] = useState<string | undefined>(undefined);
+    // Initialize activeId from navigation param when items arrive
+    useEffect(() => {
+        if (!activeId && incomingActiveId && filtered.some(f => f.id === incomingActiveId)) {
+            setActiveId(String(incomingActiveId));
+        } else if (!activeId && filtered.length > 0) {
+            setActiveId(filtered[0].id);
+        }
+    }, [incomingActiveId, filtered, activeId]);
+
+    const [screenPaused, setScreenPaused] = useState<boolean>(false);
+    useFocusEffect(
+        React.useCallback(() => {
+            setScreenPaused(false);
+            return () => setScreenPaused(true);
+        }, [])
+    );
+
     return (
         <View style={styles.container}>
-            {/* back button */}
-            <View style={{ position: 'absolute', left: 12, top: (insets.top || 24), zIndex: 200 }}>
-                <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8 }}>
-                    <Text style={{ color: 'white', fontSize: 16 }}>{'←'}</Text>
-                </TouchableOpacity>
-            </View>
             <TwoLayerFeed
                 items={filtered}
                 setItems={setItems}
+                activeId={activeId}
+                setActiveId={setActiveId}
                 onProfilePress={(post) => router.push({ pathname: '/profile', params: { id: post.creator } })}
                 onOpenComments={(post) => { /* noop */ }}
                 onReload={() => {
@@ -117,6 +131,10 @@ export default function CategoryPage() {
                         setLoadingMore(false);
                     }, 600);
                 }}
+                externalPaused={screenPaused}
+                showBackButton
+                onBack={() => router.back()}
+                categoryLabel={String(slug)}
             />
 
             {loadingMore && (
@@ -130,6 +148,9 @@ export default function CategoryPage() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'black' },
+    // Back button now lives in the per-post overlay
+    catLabelWrap: { backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+    catLabelText: { color: 'white', fontWeight: '700', fontSize: 14 },
     header: { color: 'white', fontSize: 18, padding: 12 },
     categoryBadgeContainer: { position: 'absolute', left: 12, top: 24 },
     categoryRow: { flexDirection: 'row', alignItems: 'center' },

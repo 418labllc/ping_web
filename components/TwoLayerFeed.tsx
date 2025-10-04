@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { Link } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import PostSingle from './post/PostSingle';
 import PostSingleOverlay from './post/PostSingleOverlayNew';
+import { Ionicons } from '@expo/vector-icons';
 
 export type PlayIndexObject = { a: number; b: number };
 
@@ -17,124 +18,147 @@ type Props = {
     onOpenComments?: (post: any) => void;
     onReload?: () => void;
     onActiveChange?: (post: any | null) => void;
-    onToggleCategoryFilter?: (category: string) => void;
+    /** Optional externally controlled active id (stabilizes across filtering) */
+    activeId?: string;
+    /** Setter for controlled active id (used on swipe) */
+    setActiveId?: (id: string) => void;
+    /** When true, pause all videos; when false, ensure playing. Used for screen focus/unfocus. */
+    externalPaused?: boolean;
+    /** Overlay back button controls (used on category screen) */
+    showBackButton?: boolean;
+    onBack?: () => void;
+    categoryLabel?: string;
     // onDiscoverBy removed — discover labels are not clickable
 };
 
-export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB = 1, onProfilePress, onOpenComments, onReload, onActiveChange, onToggleCategoryFilter }: Props) {
+export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB = 1, onProfilePress, onOpenComments, onReload, onActiveChange, activeId, setActiveId, externalPaused, showBackButton, onBack, categoryLabel }: Props) {
     const [playA, setPlayA] = useState<boolean>(true);
     const [paused, setPaused] = useState<boolean>(false);
     const lastToggleRef = React.useRef<number>(0);
     const TOGGLE_DEBOUNCE_MS = 300; // milliseconds
-    const togglePaused = () => {
+    const togglePaused = useCallback(() => {
         const now = Date.now();
         if (now - lastToggleRef.current < TOGGLE_DEBOUNCE_MS) return;
         lastToggleRef.current = now;
         setPaused((p) => !p);
-    };
+    }, []);
     const [playIndexObject, setplayIndexObject] = useState<PlayIndexObject>({ a: initialA, b: initialB });
-    const router = useRouter();
-
-    // inform parent about active item (use a as base active index)
-    useEffect(() => {
-        if (onActiveChange) {
-            const active = items[playIndexObject.a] ?? null;
-            onActiveChange(active);
-        }
-    }, [playIndexObject.a, playIndexObject.b, items, onActiveChange]);
-
-    const tap = Gesture.Tap().onStart(() => {
-        // use runOnJS to invoke the debounced toggle on the JS thread
-        runOnJS(togglePaused)();
-    });
-
+    // Shared values for transforms & layering
     const offseta = useSharedValue(0);
     const offsetb = useSharedValue(0);
     const aZindex = useSharedValue(10);
     const bZindex = useSharedValue(0);
+    const activeIsA = useSharedValue(1); // 1 = A active, 0 = B active
 
-    const updateB = (number: number) => {
-        setplayIndexObject((prevState) => ({ ...prevState, b: prevState.a + number }));
-    };
-    const updateA = (number: number) => {
-        setplayIndexObject((prevState) => ({ ...prevState, a: prevState.b + number }));
-    };
-    const updateReload = (number: number) => {
-        if (onReload) runOnJS(onReload)();
-    };
-
-    const pan = useMemo(
-        () =>
-            Gesture.Pan()
-                .onEnd((e) => {
-                    const direction = Math.sign(e.translationY) === 1 ? 'Up' : 'Down';
-
-                    if (Math.abs(e.translationY) > 400) {
-                        runOnJS(setPaused)(false);
-                        if (aZindex.value > 0) {
-                            // A on top
-                            if (direction === 'Up' && playIndexObject.a <= 0) {
-                                return;
-                            }
-                            aZindex.value = 0;
-                            bZindex.value = 10;
-                            offseta.value = 0;
-                            runOnJS(setPlayA)(false);
-                        } else {
-                            // B on top
-                            if (direction === 'Up' && playIndexObject.b <= 0) {
-                                return;
-                            }
-
-                            if (direction === 'Down' && playIndexObject.b >= items.length - 1) {
-                                return;
-                            }
-                            aZindex.value = 10;
-                            bZindex.value = 0;
-                            offsetb.value = 0;
-                            runOnJS(setPlayA)(true);
-                        }
-                    } else {
-                        offseta.value = 0;
-                        offsetb.value = 0;
-                    }
-                })
-                .onChange((e) => {
-                    ('worklet');
-                    const direction = Math.sign(e.translationY) === 1 ? 'Up' : 'Down';
-
-                    if (aZindex.value > 0) {
-                        if (direction === 'Up' && playIndexObject.a > 0) {
-                            runOnJS(updateB)(-1);
-                        } else {
-                            runOnJS(updateB)(1);
-                        }
-
-                        if ((playIndexObject.a > 0 && direction === 'Up') || (playIndexObject.a >= 0 && direction === 'Down' && playIndexObject.a < items.length - 1 && playIndexObject.a <= items.length - 1 && direction === 'Down')) {
-                            offseta.value = e.changeY + offseta.value;
-                        } else {
-                            runOnJS(updateReload)(1);
-                        }
-                    } else {
-                        if (direction === 'Up' && playIndexObject.b > 0) {
-                            runOnJS(updateA)(-1);
-                        } else {
-                            runOnJS(updateA)(1);
-                        }
-                        if ((playIndexObject.b < items.length - 1 && direction === 'Down') || (playIndexObject.b <= items.length - 1 && direction === 'Up')) {
-                            offsetb.value = e.changeY + offsetb.value;
-                        } else {
-                            runOnJS(updateReload)(1);
-                        }
-                    }
-                }),
-        [playIndexObject, aZindex, bZindex, items.length]
-    );
+    // Removed effect-based z-index sync to avoid one-frame mismatch flash.
 
     const animatedStylesa = useAnimatedStyle(() => ({ transform: [{ translateY: offseta.value }], zIndex: aZindex.value, height: '100%' }));
     const animatedStylesb = useAnimatedStyle(() => ({ transform: [{ translateY: offsetb.value }], zIndex: bZindex.value, height: '100%' }));
 
-    // helpers to update like on parent items array
+    // Removed global tap-to-pause to prevent overlay taps from pausing video; rely on PostSingle's pressable over video only.
+
+    // Sync internal paused with external control (screen focus/unfocus)
+    useEffect(() => {
+        if (typeof externalPaused === 'boolean') {
+            setPaused(externalPaused);
+        }
+    }, [externalPaused]);
+
+    // shiftActive implements the final commit (flip) after release
+    const shiftActive = useCallback((delta: number) => {
+        const currentIdx = playA ? playIndexObject.a : playIndexObject.b;
+        const nextIdx = Math.min(Math.max(currentIdx + delta, 0), items.length - 1);
+        if (nextIdx === currentIdx) return;
+        if (setActiveId) {
+            const nextItem = items[nextIdx];
+            if (nextItem) setActiveId(nextItem.id);
+        }
+        // Load next into hidden layer first
+        setplayIndexObject(prev => playA ? { a: prev.a, b: nextIdx } : { a: nextIdx, b: prev.b });
+        // Synchronously update layer stacking before React paints next frame
+        if (playA) {
+            // B will become active
+            aZindex.value = 0; bZindex.value = 10; activeIsA.value = 0;
+        } else {
+            aZindex.value = 10; bZindex.value = 0; activeIsA.value = 1;
+        }
+        setPlayA(p => !p);
+    }, [playA, playIndexObject.a, playIndexObject.b, items, setActiveId, aZindex, bZindex, activeIsA]);
+
+    // JS function to update hidden layer index (called via runOnJS from worklet)
+    const updateHiddenIndex = useCallback((candidateIdx: number, wasAActive: number) => {
+        setplayIndexObject((prev) => wasAActive === 1 ? { a: prev.a, b: candidateIdx } : { a: candidateIdx, b: prev.b });
+    }, []);
+
+    // Track last reported active id to avoid loops
+    const lastReportedId = useRef<string | undefined>(undefined);
+    // Persist last non-null items per layer to avoid transient unmount blank frames
+    const lastItemARef = useRef<any>(null);
+    const lastItemBRef = useRef<any>(null);
+    if (items[playIndexObject.a]) lastItemARef.current = items[playIndexObject.a];
+    if (items[playIndexObject.b]) lastItemBRef.current = items[playIndexObject.b];
+    const postA = items[playIndexObject.a] || lastItemARef.current;
+    const postB = items[playIndexObject.b] || lastItemBRef.current;
+
+    // Report active item to parent (only when actual visible post id changes).
+    useEffect(() => {
+        const activeIdx = playA ? playIndexObject.a : playIndexObject.b;
+        const active = items[activeIdx] ?? null;
+        const id = active?.id;
+        if (id === lastReportedId.current) return;
+        lastReportedId.current = id;
+        if (!activeId || activeId === id) {
+            onActiveChange?.(active);
+        }
+    }, [playA, playIndexObject.a, playIndexObject.b, items, activeId, onActiveChange]);
+
+    // Keep active layer stable when list or filter changes: realign the index of the active id without flipping layers.
+    useEffect(() => {
+        if (!activeId) return;
+        const newIdx = items.findIndex(it => it.id === activeId);
+        if (newIdx === -1) return;
+        setplayIndexObject(prev => {
+            const activeLayerIdx = playA ? prev.a : prev.b;
+            const inactiveLayerIdx = playA ? prev.b : prev.a;
+            if (activeLayerIdx === newIdx) return prev;
+            let neighbor = newIdx + 1 < items.length ? newIdx + 1 : newIdx - 1;
+            if (neighbor < 0) neighbor = newIdx;
+            return playA
+                ? { a: newIdx, b: neighbor === newIdx ? inactiveLayerIdx : neighbor }
+                : { a: neighbor === newIdx ? inactiveLayerIdx : neighbor, b: newIdx };
+        });
+        // Leave z-index values as-is to avoid a one-frame overlay flicker.
+    }, [activeId, items, playA]);
+
+    // predictive preload during gesture
+    const pan = useMemo(
+        () =>
+            Gesture.Pan()
+                .onChange((event) => {
+                    'worklet';
+                    if (activeIsA.value === 1) offseta.value = event.translationY; else offsetb.value = event.translationY;
+                    const deltaY = event.translationY;
+                    if (Math.abs(deltaY) < 40) return;
+                    const isSwipeUp = deltaY > 0; // drag downward => previous
+                    const currentIdx = activeIsA.value === 1 ? playIndexObject.a : playIndexObject.b;
+                    const candidateIdx = currentIdx + (isSwipeUp ? -1 : 1);
+                    if (candidateIdx < 0 || candidateIdx >= items.length) return;
+                    if (activeIsA.value === 1 && playIndexObject.b === candidateIdx) return;
+                    if (activeIsA.value === 0 && playIndexObject.a === candidateIdx) return;
+                    runOnJS(updateHiddenIndex)(candidateIdx, activeIsA.value);
+                })
+                .onEnd((event) => {
+                    'worklet';
+                    const distance = Math.abs(event.translationY);
+                    if (distance > 400) {
+                        const direction = Math.sign(event.translationY) === 1 ? -1 : 1;
+                        runOnJS(setPaused)(false);
+                        runOnJS(shiftActive)(direction);
+                    }
+                    offseta.value = 0; offsetb.value = 0;
+                }),
+        [playIndexObject.a, playIndexObject.b, items.length, updateHiddenIndex, shiftActive, activeIsA]
+    );
     const toggleLikeAt = (index: number, delta = 1) => {
         const post = items[index];
         if (!post) return;
@@ -143,81 +167,93 @@ export default function TwoLayerFeed({ items, setItems, initialA = 0, initialB =
         }
     };
 
+    const OverlayMemo = useMemo(() => React.memo(PostSingleOverlay, (p, n) => p.post?.id === n.post?.id && p.currentLikeState.counter === n.currentLikeState.counter), []);
+
     return (
         <GestureDetector gesture={pan}>
-            <GestureDetector gesture={tap}>
-                <View style={{ flex: 1, backgroundColor: 'black', height: '100%' }}>
-                    <Animated.View style={[{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }, animatedStylesa]}>
-                        <View style={{ flex: 1 }}>
-                            {/* per-post top-left badge */}
-                            {items[playIndexObject.a] && (
-                                <View style={{ position: 'absolute', left: 12, top: 24, zIndex: 60 }} pointerEvents="box-none">
-                                    <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Link href={{ pathname: '/category/[slug]', params: { slug: (items[playIndexObject.a].category || '').replace(/^s\//, '').toLowerCase() } }} style={{ textDecorationLine: 'none' }}>
-                                                <Text style={{ color: 'white', fontWeight: '600' }}>{items[playIndexObject.a].category}</Text>
-                                            </Link>
+            <View style={{ flex: 1, backgroundColor: 'black', height: '100%' }}>
+                <Animated.View style={[{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }, animatedStylesa]}>
+                    <View style={{ flex: 1 }}>
+                        {/* per-post top-left badge */}
+                        {items[playIndexObject.a] && (
+                            <View style={{ position: 'absolute', left: 12, top: 24, zIndex: 60 }} pointerEvents="box-none">
+                                <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        {showBackButton && (
+                                            <Pressable onPress={onBack} style={{ backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: 6, marginRight: 6 }} hitSlop={12}>
+                                                <Ionicons name="chevron-back" size={20} color="white" />
+                                            </Pressable>
+                                        )}
+                                        <Link href={{ pathname: '/category/[slug]', params: { slug: (items[playIndexObject.a].category || '').replace(/^s\//, '').toLowerCase() } }} style={{ textDecorationLine: 'none' }}>
+                                            <Text style={{ color: 'white', fontWeight: '600' }}>{items[playIndexObject.a].category}</Text>
+                                        </Link>
 
-                                            <TouchableOpacity onPress={() => onToggleCategoryFilter?.(items[playIndexObject.a].category)} style={{ marginLeft: 8, padding: 6 }}>
-                                                <Text style={{ color: 'white', opacity: 0.8 }}>📌</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                        <Text style={{ color: 'white', textDecorationLine: 'underline', fontSize: 12, marginTop: 4 }}>Discovered by thesixtyone</Text>
+                                        {/* pin removed */}
                                     </View>
+                                    <Text style={{ color: 'white', textDecorationLine: 'underline', fontSize: 12, marginTop: 4 }}>Discovered by thesixtyone</Text>
                                 </View>
-                            )}
-                            <PostSingle post={items[playIndexObject.a]} paused={paused || !playA} uri={items[playIndexObject.a]?.uri} tap={tap as any} onTogglePause={() => togglePaused()} />
+                            </View>
+                        )}
+                        <PostSingle post={postA} paused={paused || !playA} uri={postA?.uri} onTogglePause={togglePaused} />
 
-                            {items[playIndexObject.a] && (
-                                <PostSingleOverlay
-                                    post={items[playIndexObject.a]}
-                                    user={{ displayName: 'User', photoURL: undefined }}
-                                    currentLikeState={{ state: !!items[playIndexObject.a].liked, counter: items[playIndexObject.a].likesCount }}
-                                    commentsCount={items[playIndexObject.a].commentsCount}
-                                    handleUpdateLike={(delta = 1) => toggleLikeAt(playIndexObject.a, delta)}
-                                    handleProfleTouch={() => onProfilePress?.(items[playIndexObject.a])}
-                                    onOpenComments={() => onOpenComments?.(items[playIndexObject.a])}
-                                />
-                            )}
-                        </View>
-                    </Animated.View>
+                        {postA && (
+                            <OverlayMemo
+                                post={postA}
+                                user={{ displayName: 'User', photoURL: undefined }}
+                                currentLikeState={{ state: !!postA.liked, counter: postA.likesCount }}
+                                commentsCount={postA.commentsCount}
+                                handleUpdateLike={(delta = 1) => toggleLikeAt(playIndexObject.a, delta)}
+                                handleProfleTouch={() => onProfilePress?.(postA)}
+                                onOpenComments={() => onOpenComments?.(postA)}
+                                showBackButton={false}
+                                onBack={onBack}
+                                categoryLabel={categoryLabel}
+                            />
+                        )}
+                    </View>
+                </Animated.View>
 
-                    <Animated.View style={[{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }, animatedStylesb]}>
-                        <View style={{ flex: 1 }}>
-                            {/* per-post top-left badge */}
-                            {items[playIndexObject.b] && (
-                                <View style={{ position: 'absolute', left: 12, top: 24, zIndex: 60 }} pointerEvents="box-none">
-                                    <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Link href={{ pathname: '/category/[slug]', params: { slug: (items[playIndexObject.b].category || '').replace(/^s\//, '').toLowerCase() } }} style={{ textDecorationLine: 'none' }}>
-                                                <Text style={{ color: 'white', fontWeight: '600' }}>{items[playIndexObject.b].category}</Text>
-                                            </Link>
+                <Animated.View style={[{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }, animatedStylesb]}>
+                    <View style={{ flex: 1 }}>
+                        {/* per-post top-left badge */}
+                        {items[playIndexObject.b] && (
+                            <View style={{ position: 'absolute', left: 12, top: 24, zIndex: 60 }} pointerEvents="box-none">
+                                <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        {showBackButton && (
+                                            <Pressable onPress={onBack} style={{ backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: 6, marginRight: 6 }} hitSlop={12}>
+                                                <Ionicons name="chevron-back" size={20} color="white" />
+                                            </Pressable>
+                                        )}
+                                        <Link href={{ pathname: '/category/[slug]', params: { slug: (items[playIndexObject.b].category || '').replace(/^s\//, '').toLowerCase() } }} style={{ textDecorationLine: 'none' }}>
+                                            <Text style={{ color: 'white', fontWeight: '600' }}>{items[playIndexObject.b].category}</Text>
+                                        </Link>
 
-                                            <TouchableOpacity onPress={() => onToggleCategoryFilter?.(items[playIndexObject.b].category)} style={{ marginLeft: 8, padding: 6 }}>
-                                                <Text style={{ color: 'white', opacity: 0.8 }}>📌</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                        <Text style={{ color: 'white', fontSize: 12, marginTop: 4 }}>discovered by user123</Text>
+                                        {/* pin removed */}
                                     </View>
+                                    <Text style={{ color: 'white', fontSize: 12, marginTop: 4 }}>discovered by user123</Text>
                                 </View>
-                            )}
-                            <PostSingle post={items[playIndexObject.b]} paused={paused || playA} uri={items[playIndexObject.b]?.uri} tap={tap as any} onTogglePause={() => togglePaused()} />
+                            </View>
+                        )}
+                        <PostSingle post={postB} paused={paused || playA} uri={postB?.uri} onTogglePause={togglePaused} />
 
-                            {items[playIndexObject.b] && (
-                                <PostSingleOverlay
-                                    post={items[playIndexObject.b]}
-                                    user={{ displayName: 'User', photoURL: undefined }}
-                                    currentLikeState={{ state: !!items[playIndexObject.b].liked, counter: items[playIndexObject.b].likesCount }}
-                                    commentsCount={items[playIndexObject.b].commentsCount}
-                                    handleUpdateLike={(delta = 1) => toggleLikeAt(playIndexObject.b, delta)}
-                                    handleProfleTouch={() => onProfilePress?.(items[playIndexObject.b])}
-                                    onOpenComments={() => onOpenComments?.(items[playIndexObject.b])}
-                                />
-                            )}
-                        </View>
-                    </Animated.View>
-                </View>
-            </GestureDetector>
+                        {postB && (
+                            <OverlayMemo
+                                post={postB}
+                                user={{ displayName: 'User', photoURL: undefined }}
+                                currentLikeState={{ state: !!postB.liked, counter: postB.likesCount }}
+                                commentsCount={postB.commentsCount}
+                                handleUpdateLike={(delta = 1) => toggleLikeAt(playIndexObject.b, delta)}
+                                handleProfleTouch={() => onProfilePress?.(postB)}
+                                onOpenComments={() => onOpenComments?.(postB)}
+                                showBackButton={false}
+                                onBack={onBack}
+                                categoryLabel={categoryLabel}
+                            />
+                        )}
+                    </View>
+                </Animated.View>
+            </View>
         </GestureDetector>
     );
 }
