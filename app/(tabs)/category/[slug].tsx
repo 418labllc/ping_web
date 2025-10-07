@@ -133,7 +133,9 @@ export default function CategoryPage() {
                 }}
                 externalPaused={screenPaused}
                 showBackButton
-                onBack={() => router.back()}
+                onBack={() => {
+                    router.replace({ pathname: '/' } as any);
+                }}
                 categoryLabel={String(slug)}
             />
 

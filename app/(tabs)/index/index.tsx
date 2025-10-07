@@ -102,26 +102,6 @@ export default function FeedScreen() {
                     </TouchableOpacity>
                 </View>
             )}
-            {/* overlays are provided per layer inside TwoLayerFeed */}
-
-            {/* category badge + discover UI (top-left) */}
-            {item ? (
-                <View pointerEvents="box-none">
-                    <View style={styles.categoryBadgeContainer} pointerEvents="box-none">
-                        <View style={styles.categoryRow}>
-                            <TouchableOpacity onPress={() => {
-                                const slug = (item.category || '').replace(/^s\//, '').toLowerCase();
-                                router.push({ pathname: '/category/[slug]', params: { slug, activeId: item.id } });
-                            }} style={styles.categoryBadgeTouchable}>
-                                <Text style={styles.categoryText}>{item.category}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                    <View style={styles.discoverContainer} pointerEvents="box-none">
-                        <Text style={styles.discoverText}>Discovered by thesixtyone</Text>
-                    </View>
-                </View>
-            ) : null}
 
             {(isFetchingNextPage || isLoading) && (
                 <View style={{ position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center' }}>

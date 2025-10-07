@@ -73,9 +73,10 @@ export default function Layout() {
         }}
       />
       <Tabs.Screen
-        name="index"
+        name="index/index"
         options={{
           title: 'Home',
+          headerShown: false,
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="home" color={color} size={size} />,
         }}
       />
