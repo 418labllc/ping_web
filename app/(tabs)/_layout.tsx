@@ -1,11 +1,11 @@
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { selectCurrentUser, userStateChange } from '../store/reducers/authSlice';
+import CustomHeader from '../../components/layout/CustomHeader';
 import { useAppDispatch, useAppSelector } from '../hooks/redux.hook';
 import { fetchCurrentUser, useCreateUser, useCurrentUser } from '../hooks/services/useUser.hook';
-import CustomHeader from '../../components/layout/CustomHeader';
+import { selectCurrentUser, userStateChange } from '../store/reducers/authSlice';
 
 export default function Layout() {
   const [userUID, setuserUID] = useState<string>('');
@@ -66,14 +66,14 @@ export default function Layout() {
     <Tabs screenOptions={{ headerShown: true, tabBarStyle: { backgroundColor: '#323232' }, header: ({ route }) => <CustomHeader title={route.name} />, }}>
 
       <Tabs.Screen
-        name="search/index"
+        name="search"
         options={{
           title: 'Search',
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="search" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="index/index"
+        name="index"
         options={{
           title: 'Home',
           headerShown: false,
@@ -93,7 +93,7 @@ export default function Layout() {
         options={{
           href: null,
           title: 'Subs',
-          tabBarIcon: ({ color, size }: any) => <FontAwesome name="id-card" color={color} size={size} />,
+          tabBarIcon: ({ color, size }: any) => <Ionicons name="albums-outline" color={color} size={size} />,
         }}
       />
     </Tabs>
