@@ -9,7 +9,7 @@ import {
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PostSingle from "./post/PostSingle";
-import PostSingleOverlay from "./post/PostSingleOverlayNew";
+import PostSingleOverlay from "./post/PostSingleOverlay";
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 

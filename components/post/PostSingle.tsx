@@ -25,6 +25,7 @@ function PostSingleComponent({ paused, post, uri, onTogglePause }: Props) {
     const lastPosRef = useRef<number>(0);
     const restorePendingRef = useRef<boolean>(false);
     const [loaded, setLoaded] = useState(false);
+    const [userPaused, setUserPaused] = useState(false);
 
     const handleProgress = (progress: { currentTime: number; playableDuration: number; seekableDuration: number }) => {
         const curMs = progress.currentTime * 1000;
@@ -56,6 +57,8 @@ function PostSingleComponent({ paused, post, uri, onTogglePause }: Props) {
         if (post?.id) {
             lastIdRef.current = post.id;
         }
+        // Reset user pause state when switching to a new post
+        setUserPaused(false);
     }, [post?.id]);
 
     const formatMs = (ms: number) => {
@@ -65,6 +68,8 @@ function PostSingleComponent({ paused, post, uri, onTogglePause }: Props) {
         const secs = totalSeconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    const effectivePaused = paused || userPaused;
 
     return (
         <View style={styles.container}>
@@ -77,14 +82,26 @@ function PostSingleComponent({ paused, post, uri, onTogglePause }: Props) {
                         resizeMode="cover"
                         repeat
                         muted
-                        paused={paused}
+                        paused={effectivePaused}
                         onProgress={handleProgress}
                         onLoadStart={handleLoadStart}
                         onLoad={handleLoad}
                         ignoreSilentSwitch="obey"
                     />
                 )}
-                {/* Removed tap-to-pause so overlay taps don't inadvertently pause */}
+                {/* Full-screen tap to toggle pause/play (overlay sits above this) */}
+                <Pressable
+                    onPress={() => {
+                        setUserPaused((p) => !p);
+                        if (onTogglePause) onTogglePause();
+                    }}
+                    // Sit above the video but below external overlays
+                    style={styles.tapCatcher}
+                    android_ripple={{ color: 'transparent' }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Toggle playback"
+                    hitSlop={0}
+                />
             </View>
             <View style={styles.statusPillContainer} pointerEvents="none">
                 <View style={styles.statusPill}>
@@ -114,6 +131,7 @@ export default PostSingle;
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'black' },
     media: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, width: '100%', height: '100%' },
+    tapCatcher: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
     placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     statusPillContainer: { position: 'absolute', right: 12, top: 12, zIndex: 200 },
     statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)' },
