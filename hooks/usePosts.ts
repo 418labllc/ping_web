@@ -36,28 +36,28 @@ export function usePosts(opts: UsePostsOptions = {}) {
         },
         initialPageParam: null as string | null,
         getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.endCursor : null),
-                staleTime: 15_000,
+        staleTime: 15_000,
     });
 
-            // Dev-only logging for network/page results
-            useEffect(() => {
-                if (!__DEV__) return;
-                const pages = query.data?.pages ?? [];
-                if (!pages.length) return;
-                const last = pages[pages.length - 1];
-                console.log('[RQ][usePosts][data]', {
-                    pages: pages.length,
-                    lastCount: last?.items?.length ?? 0,
-                    endCursor: last?.endCursor ?? null,
-                    hasMore: last?.hasMore ?? false,
-                });
-            }, [query.data]);
+    // Dev-only logging for network/page results
+    useEffect(() => {
+        if (!__DEV__) return;
+        const pages = query.data?.pages ?? [];
+        if (!pages.length) return;
+        const last = pages[pages.length - 1];
+        console.log('[RQ][usePosts][data]', {
+            pages: pages.length,
+            lastCount: last?.items?.length ?? 0,
+            endCursor: last?.endCursor ?? null,
+            hasMore: last?.hasMore ?? false,
+        });
+    }, [query.data]);
 
-            useEffect(() => {
-                if (__DEV__ && query.error) {
-                    console.warn('[RQ][usePosts][error]', String(query.error));
-                }
-            }, [query.error]);
+    useEffect(() => {
+        if (__DEV__ && query.error) {
+            console.warn('[RQ][usePosts][error]', String(query.error));
+        }
+    }, [query.error]);
 
     const flat = query.data?.pages.flatMap((p) => p.items) ?? [];
     return {

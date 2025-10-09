@@ -4,6 +4,6 @@ import { GraphQLClient } from 'graphql-request';
 const endpoint = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/graphql';
 
 export const gqlClient = new GraphQLClient(endpoint, {
-  // Optionally attach auth token here via an interceptor per request
-  headers: {},
+    // Optionally attach auth token here via an interceptor per request
+    headers: {},
 });
