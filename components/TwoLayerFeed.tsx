@@ -26,6 +26,9 @@ type Props = {
     showBackButton?: boolean;
     onBack?: () => void;
     categoryLabel?: string;
+    // When this token changes, the list will reset to the top and suppress
+    // viewability callbacks briefly. Useful when switching sort/filter modes.
+    resetToken?: number;
 };
 
 export default function VideoFeedFlashList({
@@ -41,6 +44,7 @@ export default function VideoFeedFlashList({
     showBackButton,
     onBack,
     categoryLabel,
+    resetToken,
 }: Props) {
     const flatListRef = useRef<FlashListRef<any>>(null);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -48,6 +52,8 @@ export default function VideoFeedFlashList({
     const [listHeight, setListHeight] = useState<number>(SCREEN_H);
     const ITEM_H = Math.max(1, listHeight || SCREEN_H);
     const insets = useSafeAreaInsets();
+    const isResettingRef = useRef(false);
+    const lastEmittedIdRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
         if (typeof externalPaused === "boolean") {
@@ -68,12 +74,16 @@ export default function VideoFeedFlashList({
 
     const onViewableItemsChanged = useRef(
         ({ viewableItems }: { viewableItems: any[] }) => {
+            if (isResettingRef.current) return;
             if (!viewableItems?.length) return;
             const visible = viewableItems[0]?.index ?? 0;
             setActiveIndex(visible);
-            onActiveChange?.(items[visible]);
             const id = items[visible]?.id as string | undefined;
-            if (id) setActiveId?.(id);
+            if (id && lastEmittedIdRef.current !== id) {
+                lastEmittedIdRef.current = id;
+                onActiveChange?.(items[visible]);
+                setActiveId?.(id);
+            }
         }
     ).current;
 
@@ -155,6 +165,7 @@ export default function VideoFeedFlashList({
     // 👇 Manual snapping for perfect TikTok-like paging
     const handleMomentumScrollEnd = useCallback(
         (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            if (isResettingRef.current) return;
             const offsetY = e.nativeEvent.contentOffset.y;
             const newIndex = Math.round(offsetY / ITEM_H);
 
@@ -168,13 +179,40 @@ export default function VideoFeedFlashList({
 
             if (newIndex !== activeIndex) {
                 setActiveIndex(newIndex);
-                onActiveChange?.(items[newIndex]);
                 const id = items[newIndex]?.id as string | undefined;
-                if (id) setActiveId?.(id);
+                if (id && lastEmittedIdRef.current !== id) {
+                    lastEmittedIdRef.current = id;
+                    onActiveChange?.(items[newIndex]);
+                    setActiveId?.(id);
+                }
             }
         },
         [activeIndex, items, ITEM_H]
     );
+
+    // Reset list to top on resetToken changes (e.g., sort/filter switch)
+    useEffect(() => {
+        if (typeof resetToken === 'number') {
+            isResettingRef.current = true;
+            // Scroll to top without animation
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            // Update active index/state to the first item if present
+            if (items.length > 0) {
+                setActiveIndex(0);
+                const id = items[0]?.id as string | undefined;
+                if (id) {
+                    lastEmittedIdRef.current = id;
+                    onActiveChange?.(items[0]);
+                    setActiveId?.(id);
+                }
+            }
+            // Allow viewability after a short delay
+            const t = setTimeout(() => {
+                isResettingRef.current = false;
+            }, 200);
+            return () => clearTimeout(t);
+        }
+    }, [resetToken]);
 
     return (
         <View style={{ flex: 1 }} onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}>

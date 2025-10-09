@@ -17,7 +17,11 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow Ping to use your camera to scan QR codes for help."
+        "NSCameraUsageDescription": "Allow Sub to use your camera to scan QR codes for help.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsArbitraryLoadsInWebContent": true
+        }
       },
       "bundleIdentifier": "com.418labs.ping"
     },
@@ -58,6 +62,11 @@
         {
           "ios": {
             "useFrameworks": "static"
+          },
+          "android": {
+            "manifestApplicationAttributes": {
+              "android:usesCleartextTraffic": "true"
+            }
           }
         }
       ],
