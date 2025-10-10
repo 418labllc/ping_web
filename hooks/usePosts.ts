@@ -25,11 +25,12 @@ export function usePosts(opts: UsePostsOptions = {}) {
                 uri: p.uri,
                 media: p.uri ? [p.uri] : [],
                 description: p.description ?? '',
-                likesCount: p.heartsCount ?? 0,
+                heartsCount: p.heartsCount ?? 0,
                 commentsCount: 0,
                 liked: false,
                 creator: typeof p.creator === 'string' ? p.creator : p?.creator?.id ?? '',
                 createdAt: p.createdAt,
+                category: p?.category ?? undefined,
             }));
             const endCursor = mapped.length ? mapped[mapped.length - 1].id : null;
             return { items: mapped, endCursor, hasMore: mapped.length >= pageSize };

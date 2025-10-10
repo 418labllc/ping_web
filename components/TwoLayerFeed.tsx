@@ -5,6 +5,7 @@ import {
     Platform,
     NativeScrollEvent,
     NativeSyntheticEvent,
+    RefreshControl,
 } from "react-native";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +30,9 @@ type Props = {
     // When this token changes, the list will reset to the top and suppress
     // viewability callbacks briefly. Useful when switching sort/filter modes.
     resetToken?: number;
+    // Pull-to-refresh
+    onRefresh?: () => void;
+    refreshing?: boolean;
 };
 
 export default function VideoFeedFlashList({
@@ -45,6 +49,8 @@ export default function VideoFeedFlashList({
     onBack,
     categoryLabel,
     resetToken,
+    onRefresh,
+    refreshing,
 }: Props) {
     const flatListRef = useRef<FlashListRef<any>>(null);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -116,7 +122,7 @@ export default function VideoFeedFlashList({
                             ? {
                                 ...it,
                                 liked: true,
-                                likesCount: (it.likesCount || 0) + d,
+                                heartsCount: (it.heartsCount || 0) + d,
                             }
                             : it
                     )
@@ -142,7 +148,7 @@ export default function VideoFeedFlashList({
                         user={{ displayName: "User" }}
                         currentLikeState={{
                             state: !!item.liked,
-                            counter: item.likesCount,
+                            counter: item.heartsCount,
                         }}
                         commentsCount={item.commentsCount}
                         handleUpdateLike={handleUpdateLike}
@@ -150,11 +156,7 @@ export default function VideoFeedFlashList({
                         onOpenComments={() => onOpenComments?.(item)}
                         showBackButton={showBackButton}
                         onBack={onBack}
-                        categoryLabel={
-                            typeof (item as any)?.category === "string"
-                                ? (item as any).category
-                                : categoryLabel
-                        }
+                        categoryLabel={(item as any)?.category?.slug}
                     />
                 </View>
             );
@@ -233,9 +235,21 @@ export default function VideoFeedFlashList({
                 snapToInterval={ITEM_H}
                 snapToAlignment="start"
                 disableIntervalMomentum
-                bounces={false}
+                // Enable bounce on iOS so pull-to-refresh can engage at top
+                bounces={Platform.OS === 'ios'}
+                alwaysBounceVertical={Platform.OS === 'ios'}
                 removeClippedSubviews
                 contentContainerStyle={{ paddingBottom: insets.bottom }}
+                refreshControl={
+                    onRefresh ? (
+                        <RefreshControl
+                            refreshing={!!refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={Platform.OS === 'ios' ? '#fff' : undefined}
+                            colors={Platform.OS === 'android' ? ['#ffffff'] : undefined}
+                        />
+                    ) : undefined
+                }
             />
         </View>
     );

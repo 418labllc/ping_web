@@ -18,7 +18,7 @@ function generateItems(startIndex: number, count: number) {
       description: `Search result #${idx}`,
       uri,
       category: `s/${['RealEstate', 'Home', 'Auto', 'Food'][idx % 4]}`,
-      likesCount: Math.floor(Math.random() * 100),
+      heartsCount: Math.floor(Math.random() * 100),
       commentsCount: Math.floor(Math.random() * 20),
       liked: false,
     });

@@ -26,7 +26,7 @@ export function useInfiniteFeed(opts: UseInfiniteFeedOptions = {}) {
                 uri: p.uri,
                 media: p.uri ? [p.uri] : [],
                 description: p.description ?? '',
-                likesCount: p.heartsCount ?? 0,
+                heartsCount: p.heartsCount ?? 0,
                 commentsCount: 0,
                 liked: false,
                 creator: typeof p.creator === 'string' ? p.creator : p?.creator?.id ?? '',

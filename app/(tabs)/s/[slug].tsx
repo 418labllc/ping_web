@@ -1,49 +1,40 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    StyleSheet,
     View,
-    Dimensions,
     Text,
+    StyleSheet,
     TouchableOpacity,
-    StatusBar,
     ActivityIndicator,
+    StatusBar,
 } from 'react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TwoLayerFeed from '../../../components/TwoLayerFeed';
 import { usePosts } from '../../../hooks/usePosts';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
 
-const { height, width } = Dimensions.get('window');
+export default function CategoryPage() {
+    const { slug, activeId: incomingActiveId } = useLocalSearchParams();
+    const slugStr = String(slug || '').toLowerCase();
+    const router = useRouter();
+    const insets = useSafeAreaInsets();
 
-const DISCOVER_MAP: Record<string, string[]> = {
-    thesixtyone: ['agent_1', 'agent_5', 'agent_9'],
-};
-
-export default function FeedScreen() {
-    // Prefer assigning to a variable so we can access query status/error for debug
+    // Use the same infinite posts hook as index
     const query = usePosts();
     const { items: queryItems, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = query;
-    console.log(queryItems)
-    const items = queryItems;
-    const [activeItem, setActiveItem] = useState<any | null>(null);
-    const [activeId, setActiveId] = useState<string | undefined>(undefined);
-    const [discoverBy, setDiscoverBy] = useState<string | null>(null);
+
+    // Filter posts by category slug client-side
+    const filteredItems = useMemo(() => {
+        return (queryItems || []).filter((it: any) => {
+            const slugVal = it?.category?.slug ? String(it.category.slug).toLowerCase() : '';
+            return slugVal === slugStr || slugVal === `s/${slugStr}`; // accept either convention
+        });
+    }, [queryItems, slugStr]);
+
+    // Sort like index (default: hot)
     const [sortMode, setSortMode] = useState<'hot' | 'new' | 'top'>('hot');
     const [topRange, setTopRange] = useState<'15d' | '30d' | '3m' | 'all'>('all');
     const [topDropdownOpen, setTopDropdownOpen] = useState(false);
-    const [resetToken, setResetToken] = useState(0);
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
     const lastOrderRef = useRef<{ key: string; arr: any[] } | null>(null);
-
-    const handleDiscoverBy = (who: string) => setDiscoverBy(who);
-
-    // --- Filtered list ---
-    const filteredItems = useMemo(() => {
-        if (discoverBy)
-            return items.filter((it) => DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false);
-        return items;
-    }, [items, discoverBy]);
 
     const getCreatedTs = (it: any) => {
         const v = it?.createdAt ?? it?.created_at ?? it?.created ?? it?.ts ?? 0;
@@ -51,7 +42,6 @@ export default function FeedScreen() {
         return Number.isFinite(t) ? t : 0;
     };
 
-    // --- Sorted list with stable reference ---
     const sortedItems = useMemo(() => {
         const arr = [...filteredItems];
         if (sortMode === 'new') {
@@ -62,9 +52,9 @@ export default function FeedScreen() {
                 return String(a.id ?? '').localeCompare(String(b.id ?? ''));
             });
         } else if (sortMode === 'top') {
-            // Optionally filter by selected time range before computing score
+            // Filter by selected time range before computing score (same as index)
             const now = Date.now();
-            let cutoffMs = 0; // 0 means no cutoff (all time)
+            let cutoffMs = 0;
             if (topRange === '15d') cutoffMs = 15 * 24 * 60 * 60 * 1000;
             if (topRange === '30d') cutoffMs = 30 * 24 * 60 * 60 * 1000;
             if (topRange === '3m') cutoffMs = 90 * 24 * 60 * 60 * 1000;
@@ -90,34 +80,30 @@ export default function FeedScreen() {
                 const bd = getCreatedTs(b);
                 const aAgeH = Math.max(1, (now - ad) / 3600000);
                 const bAgeH = Math.max(1, (now - bd) / 3600000);
-                const ahot =
-                    ((a.heartsCount || 0) + (a.commentsCount || 0) * 0.6) / Math.pow(aAgeH + 2, 1.2);
-                const bhot =
-                    ((b.heartsCount || 0) + (b.commentsCount || 0) * 0.6) / Math.pow(bAgeH + 2, 1.2);
+                const ahot = ((a.heartsCount || 0) + (a.commentsCount || 0) * 0.6) / Math.pow(aAgeH + 2, 1.2);
+                const bhot = ((b.heartsCount || 0) + (b.commentsCount || 0) * 0.6) / Math.pow(bAgeH + 2, 1.2);
                 if (bhot !== ahot) return bhot - ahot;
                 if (bd !== ad) return bd - ad;
                 return String(a.id ?? '').localeCompare(String(b.id ?? ''));
             });
         }
-
         const key = arr.map((it) => String(it.id ?? '')).join('|');
         if (lastOrderRef.current?.key === key) return lastOrderRef.current.arr;
         lastOrderRef.current = { key, arr };
         return arr;
     }, [filteredItems, sortMode]);
 
-    // --- Active Item Tracking ---
+    // Active item tracking (respect incomingActiveId if valid)
+    const [activeId, setActiveId] = useState<string | undefined>(undefined);
     useEffect(() => {
-        if (!activeId && sortedItems.length > 0) setActiveId(sortedItems[0].id);
-    }, [sortedItems, activeId]);
-
-    useEffect(() => {
-        if (activeId && !sortedItems.some((i) => i.id === activeId)) {
-            if (sortedItems.length === 0) setActiveId(undefined);
-            else setActiveId(sortedItems[0].id);
+        if (!activeId && incomingActiveId && sortedItems.some((f) => f.id === incomingActiveId)) {
+            setActiveId(String(incomingActiveId));
+        } else if (!activeId && sortedItems.length > 0) {
+            setActiveId(sortedItems[0].id);
         }
-    }, [sortedItems, activeId]);
+    }, [incomingActiveId, sortedItems, activeId]);
 
+    // Pause/resume on focus
     const [screenPaused, setScreenPaused] = useState<boolean>(false);
     useFocusEffect(
         React.useCallback(() => {
@@ -126,33 +112,26 @@ export default function FeedScreen() {
         }, [])
     );
 
-    // Close dropdown when leaving 'top' mode
     useEffect(() => {
         if (sortMode !== 'top' && topDropdownOpen) setTopDropdownOpen(false);
     }, [sortMode, topDropdownOpen]);
 
-    // --- Render ---
     return (
         <View style={styles.container}>
             <StatusBar hidden />
 
             <TwoLayerFeed
                 items={sortedItems}
-                resetToken={resetToken}
-                // 🧠 Prevent feedback loop by not calling setItems in render
+                // Category page doesn't mutate items itself
                 setItems={() => { }}
-                onProfilePress={(post) =>
-                    router.push({ pathname: '/profile', params: { id: post.creator } })
-                }
+                onProfilePress={(post) => router.push({ pathname: '/profile', params: { id: post.creator } })}
                 onOpenComments={() => { }}
                 onReload={() => {
                     if (!isFetchingNextPage && hasNextPage) {
                         fetchNextPage();
-                    } else {
                     }
                 }}
                 onActiveChange={(post) => {
-                    setActiveItem(post);
                     if (post && post.id !== activeId) setActiveId(post.id);
                     if (post) {
                         const idx = sortedItems.findIndex((i) => i.id === post.id);
@@ -168,15 +147,12 @@ export default function FeedScreen() {
                 onRefresh={() => {
                     query.refetch();
                 }}
+                showBackButton
+                onBack={() => {
+                    router.replace({ pathname: '/' } as any);
+                }}
+                categoryLabel={String(slugStr)}
             />
-
-            {discoverBy && (
-                <View style={styles.filterPill}>
-                    <TouchableOpacity onPress={() => setDiscoverBy(null)}>
-                        <Text style={{ color: 'white' }}>Clear discover: {discoverBy}</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
 
             {(isFetchingNextPage || isLoading) && (
                 <View style={styles.loading}>
@@ -192,12 +168,7 @@ export default function FeedScreen() {
                     {(['hot', 'new', 'top'] as const).map((m) => (
                         <TouchableOpacity
                             key={m}
-                            onPress={() => {
-                                if (sortMode !== m) {
-                                    setSortMode(m);
-                                    setResetToken((t) => t + 1); // resets scroll only once
-                                }
-                            }}
+                            onPress={() => setSortMode(m)}
                             style={[styles.segmentBtn, sortMode === m && styles.segmentBtnActive]}
                         >
                             <Text style={[styles.segmentText, sortMode === m && styles.segmentTextActive]}>
@@ -227,10 +198,7 @@ export default function FeedScreen() {
                                     <TouchableOpacity
                                         key={opt.key}
                                         onPress={() => {
-                                            if (topRange !== opt.key) {
-                                                setTopRange(opt.key);
-                                                setResetToken((t) => t + 1);
-                                            }
+                                            setTopRange(opt.key);
                                             setTopDropdownOpen(false);
                                         }}
                                         style={[styles.dropdownItem, topRange === opt.key && styles.dropdownItemActive]}
@@ -252,14 +220,6 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'black' },
     topRightContainer: { position: 'absolute', right: 16, top: 40 },
-    filterPill: {
-        position: 'absolute',
-        top: 80,
-        left: 16,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        padding: 8,
-        borderRadius: 12,
-    },
     segmentWrap: {
         flexDirection: 'row',
         backgroundColor: 'rgba(0,0,0,0.5)',

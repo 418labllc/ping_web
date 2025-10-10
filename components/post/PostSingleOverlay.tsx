@@ -96,7 +96,7 @@ export default function PostSingleOverlayNewAndroid({ user, post, handleUpdateLi
             )}
             {categoryLabel ? (
               <Link
-                href={{ pathname: '/category/[slug]', params: { slug: (categoryLabel || '').replace(/^s\//, '').toLowerCase() } }}
+                href={{ pathname: "/s/[slug]", params: { slug: categoryLabel } }}
                 style={{ textDecorationLine: 'none' }}
               >
                 <Text style={styles.linkText}>{categoryLabel}</Text>
@@ -134,7 +134,7 @@ export default function PostSingleOverlayNewAndroid({ user, post, handleUpdateLi
         </View>
       </View>
       {/* Drawer removed */}
-    </View>
+    </View >
   );
 }
 

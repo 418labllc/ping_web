@@ -2,7 +2,7 @@ export type Post = {
     id: string;
     media?: string[];
     description?: string;
-    likesCount?: number;
+    heartsCount?: number;
     commentsCount?: number;
     creator?: string;
     // local client state
