@@ -18,80 +18,49 @@ export default function CategoryPage() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
-    // Use the same infinite posts hook as index
-    const query = usePosts();
+    // Sort controls and Top range dropdown state
+    const [sortMode, setSortMode] = useState<'hot' | 'new' | 'top'>('hot');
+    const [topRange, setTopRange] = useState<'15d' | '30d' | '3m' | 'all'>('all');
+    const [topDropdownOpen, setTopDropdownOpen] = useState(false);
+    const [resetToken, setResetToken] = useState(0);
+
+    // Server-side filter: only createdAfter for Top ranges (category is filtered client-side)
+    const postsFilter = useMemo(() => {
+        const f: any = {};
+        if (sortMode === 'hot') {
+            f.sort = 'HOTNESS';
+            f.hotnessMin = 0.000001; // strictly greater than 0
+        } else if (sortMode === 'new') {
+            f.sort = 'NEWEST';
+        } else {
+            f.sort = 'MOST_HEARTS';
+            if (topRange !== 'all') {
+                let ms = 0;
+                if (topRange === '15d') ms = 15 * 24 * 60 * 60 * 1000;
+                if (topRange === '30d') ms = 30 * 24 * 60 * 60 * 1000;
+                if (topRange === '3m') ms = 90 * 24 * 60 * 60 * 1000;
+                if (ms) f.createdAfter = new Date(Date.now() - ms).toISOString();
+            }
+        }
+        return f;
+    }, [sortMode, topRange]);
+
+    // Fetch posts with optional filter to trigger API calls when filters change
+    const query = usePosts({ filter: postsFilter, queryKeyExtra: slugStr });
     const { items: queryItems, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = query;
 
-    // Filter posts by category slug client-side
+    // Filter posts by category slug client-side (server doesn't accept categorySlug yet)
     const filteredItems = useMemo(() => {
         return (queryItems || []).filter((it: any) => {
             const slugVal = it?.category?.slug ? String(it.category.slug).toLowerCase() : '';
-            return slugVal === slugStr || slugVal === `s/${slugStr}`; // accept either convention
+            return slugVal === slugStr || slugVal === `s/${slugStr}`;
         });
     }, [queryItems, slugStr]);
 
     // Sort like index (default: hot)
-    const [sortMode, setSortMode] = useState<'hot' | 'new' | 'top'>('hot');
-    const [topRange, setTopRange] = useState<'15d' | '30d' | '3m' | 'all'>('all');
-    const [topDropdownOpen, setTopDropdownOpen] = useState(false);
-    const lastOrderRef = useRef<{ key: string; arr: any[] } | null>(null);
+    // Remove cached array optimization to avoid stale lists after filter changes
 
-    const getCreatedTs = (it: any) => {
-        const v = it?.createdAt ?? it?.created_at ?? it?.created ?? it?.ts ?? 0;
-        const t = typeof v === 'number' ? v : new Date(v || 0).getTime();
-        return Number.isFinite(t) ? t : 0;
-    };
-
-    const sortedItems = useMemo(() => {
-        const arr = [...filteredItems];
-        if (sortMode === 'new') {
-            arr.sort((a, b) => {
-                const ad = getCreatedTs(a);
-                const bd = getCreatedTs(b);
-                if (bd !== ad) return bd - ad;
-                return String(a.id ?? '').localeCompare(String(b.id ?? ''));
-            });
-        } else if (sortMode === 'top') {
-            // Filter by selected time range before computing score (same as index)
-            const now = Date.now();
-            let cutoffMs = 0;
-            if (topRange === '15d') cutoffMs = 15 * 24 * 60 * 60 * 1000;
-            if (topRange === '30d') cutoffMs = 30 * 24 * 60 * 60 * 1000;
-            if (topRange === '3m') cutoffMs = 90 * 24 * 60 * 60 * 1000;
-            if (cutoffMs > 0) {
-                const minTs = now - cutoffMs;
-                for (let i = arr.length - 1; i >= 0; i--) {
-                    if (getCreatedTs(arr[i]) < minTs) arr.splice(i, 1);
-                }
-            }
-            arr.sort((a, b) => {
-                const ascore = (a.heartsCount || 0) + (a.commentsCount || 0) * 0.5;
-                const bscore = (b.heartsCount || 0) + (b.commentsCount || 0) * 0.5;
-                if (bscore !== ascore) return bscore - ascore;
-                const ad = getCreatedTs(a);
-                const bd = getCreatedTs(b);
-                if (bd !== ad) return bd - ad;
-                return String(a.id ?? '').localeCompare(String(b.id ?? ''));
-            });
-        } else {
-            const now = Date.now();
-            arr.sort((a, b) => {
-                const ad = getCreatedTs(a);
-                const bd = getCreatedTs(b);
-                const aAgeH = Math.max(1, (now - ad) / 3600000);
-                const bAgeH = Math.max(1, (now - bd) / 3600000);
-                const ahot = ((a.heartsCount || 0) + (a.commentsCount || 0) * 0.6) / Math.pow(aAgeH + 2, 1.2);
-                const bhot = ((b.heartsCount || 0) + (b.commentsCount || 0) * 0.6) / Math.pow(bAgeH + 2, 1.2);
-                if (bhot !== ahot) return bhot - ahot;
-                if (bd !== ad) return bd - ad;
-                return String(a.id ?? '').localeCompare(String(b.id ?? ''));
-            });
-        }
-        const key = arr.map((it) => String(it.id ?? '')).join('|');
-        if (lastOrderRef.current?.key === key) return lastOrderRef.current.arr;
-        lastOrderRef.current = { key, arr };
-        return arr;
-    }, [filteredItems, sortMode]);
+    const sortedItems = useMemo(() => filteredItems, [filteredItems]);
 
     // Active item tracking (respect incomingActiveId if valid)
     const [activeId, setActiveId] = useState<string | undefined>(undefined);
@@ -115,6 +84,8 @@ export default function CategoryPage() {
     useEffect(() => {
         if (sortMode !== 'top' && topDropdownOpen) setTopDropdownOpen(false);
     }, [sortMode, topDropdownOpen]);
+
+    // Hot has no threshold fallback; it always uses hotnessMin=0.0
 
     return (
         <View style={styles.container}>
@@ -147,11 +118,17 @@ export default function CategoryPage() {
                 onRefresh={() => {
                     query.refetch();
                 }}
+                resetToken={resetToken}
                 showBackButton
                 onBack={() => {
                     router.replace({ pathname: '/' } as any);
                 }}
                 categoryLabel={String(slugStr)}
+                emptyMessage={
+                    sortMode === 'hot' && query.isFetched && !isLoading && sortedItems.length === 0
+                        ? `No hot videos in ${slugStr} right now`
+                        : undefined
+                }
             />
 
             {(isFetchingNextPage || isLoading) && (
@@ -168,7 +145,12 @@ export default function CategoryPage() {
                     {(['hot', 'new', 'top'] as const).map((m) => (
                         <TouchableOpacity
                             key={m}
-                            onPress={() => setSortMode(m)}
+                            onPress={() => {
+                                if (sortMode !== m) {
+                                    setSortMode(m);
+                                    setResetToken((t) => t + 1);
+                                }
+                            }}
                             style={[styles.segmentBtn, sortMode === m && styles.segmentBtnActive]}
                         >
                             <Text style={[styles.segmentText, sortMode === m && styles.segmentTextActive]}>
@@ -198,7 +180,10 @@ export default function CategoryPage() {
                                     <TouchableOpacity
                                         key={opt.key}
                                         onPress={() => {
-                                            setTopRange(opt.key);
+                                            if (topRange !== opt.key) {
+                                                setTopRange(opt.key);
+                                                setResetToken((t) => t + 1);
+                                            }
                                             setTopDropdownOpen(false);
                                         }}
                                         style={[styles.dropdownItem, topRange === opt.key && styles.dropdownItemActive]}
@@ -279,3 +264,5 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 });
+
+// Note: Hot always uses hotnessMin=0.0 (no fallback needed)

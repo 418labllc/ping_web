@@ -1,12 +1,15 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import {
     View,
+    Text,
     Dimensions,
     Platform,
     NativeScrollEvent,
     NativeSyntheticEvent,
     RefreshControl,
+    Pressable,
 } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PostSingle from "./post/PostSingle";
@@ -33,6 +36,8 @@ type Props = {
     // Pull-to-refresh
     onRefresh?: () => void;
     refreshing?: boolean;
+    // Optional message shown when items is empty
+    emptyMessage?: string;
 };
 
 export default function VideoFeedFlashList({
@@ -51,6 +56,7 @@ export default function VideoFeedFlashList({
     resetToken,
     onRefresh,
     refreshing,
+    emptyMessage,
 }: Props) {
     const flatListRef = useRef<FlashListRef<any>>(null);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -78,24 +84,8 @@ export default function VideoFeedFlashList({
         }
     }, [activeId, items, ITEM_H]);
 
-    const onViewableItemsChanged = useRef(
-        ({ viewableItems }: { viewableItems: any[] }) => {
-            if (isResettingRef.current) return;
-            if (!viewableItems?.length) return;
-            const visible = viewableItems[0]?.index ?? 0;
-            setActiveIndex(visible);
-            const id = items[visible]?.id as string | undefined;
-            if (id && lastEmittedIdRef.current !== id) {
-                lastEmittedIdRef.current = id;
-                onActiveChange?.(items[visible]);
-                setActiveId?.(id);
-            }
-        }
-    ).current;
-
-    const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 80,
-    }).current;
+    // We rely on explicit snapping (onMomentumScrollEnd) and controlled resets
+    // to determine the active index, to avoid thrashing during filter changes.
 
     // FlashList override signature: (layout, item, index, maxColumns)
     const overrideItemLayout = useCallback(
@@ -216,6 +206,28 @@ export default function VideoFeedFlashList({
         }
     }, [resetToken]);
 
+    // Also reset to top when the items source itself changes drastically,
+    // which commonly happens on sort/filter switches for the first page.
+    useEffect(() => {
+        if (!items || items.length === 0) return;
+        // If current active index points to a non-existent item, snap back to the top
+        const current = items[activeIndex];
+        if (!current) {
+            isResettingRef.current = true;
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            setActiveIndex(0);
+            const id = items[0]?.id as string | undefined;
+            if (id) {
+                lastEmittedIdRef.current = id;
+                onActiveChange?.(items[0]);
+                setActiveId?.(id);
+            }
+            setTimeout(() => {
+                isResettingRef.current = false;
+            }, 150);
+        }
+    }, [items]);
+
     return (
         <View style={{ flex: 1 }} onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}>
             <FlashList
@@ -225,8 +237,6 @@ export default function VideoFeedFlashList({
                 keyExtractor={(item, index) => item.id ?? String(index)}
                 pagingEnabled
                 showsVerticalScrollIndicator={false}
-                onViewableItemsChanged={onViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
                 overrideItemLayout={overrideItemLayout}
                 decelerationRate={Platform.OS === "ios" ? 0.98 : 0.985}
                 onMomentumScrollEnd={handleMomentumScrollEnd}
@@ -240,6 +250,39 @@ export default function VideoFeedFlashList({
                 alwaysBounceVertical={Platform.OS === 'ios'}
                 removeClippedSubviews
                 contentContainerStyle={{ paddingBottom: insets.bottom }}
+                ListEmptyComponent={emptyMessage ? (
+                    () => (
+                        <View style={{ height: ITEM_H }}>
+                            {/* Header pill like PostSingleOverlay */}
+                            <View style={{ position: 'absolute', left: 8, top: 8 }} pointerEvents="box-none">
+                                <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center' }}>
+                                    {showBackButton && (
+                                        <Pressable onPress={onBack} style={{ backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: 6, marginRight: 6 }} hitSlop={12}>
+                                            <Ionicons name="chevron-back" size={20} color="white" />
+                                        </Pressable>
+                                    )}
+                                    {categoryLabel ? (
+                                        <Text style={{ color: 'white', textDecorationLine: 'underline', fontWeight: '600' }}>{categoryLabel}</Text>
+                                    ) : null}
+                                </View>
+                            </View>
+
+                            {/* Centered empty message */}
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                <View
+                                    style={{
+                                        backgroundColor: 'rgba(0,0,0,0.45)',
+                                        paddingHorizontal: 14,
+                                        paddingVertical: 10,
+                                        borderRadius: 12,
+                                    }}
+                                >
+                                    <Text style={{ color: 'white', fontWeight: '700' }}>{emptyMessage}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    )
+                ) : undefined}
                 refreshControl={
                     onRefresh ? (
                         <RefreshControl

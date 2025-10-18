@@ -8,15 +8,21 @@ export interface UsePostsOptions {
     pageSize?: number;
     enabled?: boolean;
     filter?: any;
+    // Extra value to include in the query key (not sent to the server)
+    queryKeyExtra?: unknown;
 }
 
 interface PageData { items: any[]; endCursor: string | null; hasMore: boolean; }
 
 export function usePosts(opts: UsePostsOptions = {}) {
-    const { pageSize = POSTS_PAGE_SIZE, enabled = true, filter } = opts;
+    const { pageSize = POSTS_PAGE_SIZE, enabled = true, filter, queryKeyExtra = null } = opts;
     const query = useInfiniteQuery<PageData, Error>({
-        queryKey: ['posts', pageSize, filter ?? null],
+        queryKey: ['posts', pageSize, filter ?? null, queryKeyExtra],
         enabled,
+        // Always refetch on mount so switching to a previously used filter still hits the API
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         queryFn: async ({ pageParam }) => {
             const after = typeof pageParam === 'string' ? pageParam : null;
             const posts = await fetchPostsPage({ after, limit: pageSize, filter });

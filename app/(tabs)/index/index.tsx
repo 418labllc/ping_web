@@ -20,91 +20,51 @@ const DISCOVER_MAP: Record<string, string[]> = {
 };
 
 export default function FeedScreen() {
+    // Compute server-side filter for posts (createdAfter) based on TOP range
+    const [sortMode, setSortMode] = useState<'hot' | 'new' | 'top'>('hot');
+    const [topRange, setTopRange] = useState<'15d' | '30d' | '3m' | 'all'>('all');
+    const postsFilter = useMemo(() => {
+        const f: any = {};
+        if (sortMode === 'hot') {
+            f.sort = 'HOTNESS';
+            f.hotnessMin = 0.000001; // strictly greater than 0
+        } else if (sortMode === 'new') {
+            f.sort = 'NEWEST';
+        } else {
+            // top
+            f.sort = 'MOST_HEARTS';
+            if (topRange !== 'all') {
+                const now = Date.now();
+                let ms = 0;
+                if (topRange === '15d') ms = 15 * 24 * 60 * 60 * 1000;
+                if (topRange === '30d') ms = 30 * 24 * 60 * 60 * 1000;
+                if (topRange === '3m') ms = 90 * 24 * 60 * 60 * 1000;
+                if (ms) f.createdAfter = new Date(now - ms).toISOString();
+            }
+        }
+        return f;
+    }, [sortMode, topRange]);
     // Prefer assigning to a variable so we can access query status/error for debug
-    const query = usePosts();
+    const query = usePosts({ filter: postsFilter });
     const { items: queryItems, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = query;
-    console.log(queryItems)
     const items = queryItems;
     const [activeItem, setActiveItem] = useState<any | null>(null);
     const [activeId, setActiveId] = useState<string | undefined>(undefined);
     const [discoverBy, setDiscoverBy] = useState<string | null>(null);
-    const [sortMode, setSortMode] = useState<'hot' | 'new' | 'top'>('hot');
-    const [topRange, setTopRange] = useState<'15d' | '30d' | '3m' | 'all'>('all');
+    // sortMode and topRange moved above to build postsFilter
     const [topDropdownOpen, setTopDropdownOpen] = useState(false);
     const [resetToken, setResetToken] = useState(0);
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const lastOrderRef = useRef<{ key: string; arr: any[] } | null>(null);
+    // Removed cached array optimization to ensure fresh data applies immediately on filter switches
 
     const handleDiscoverBy = (who: string) => setDiscoverBy(who);
 
-    // --- Filtered list ---
-    const filteredItems = useMemo(() => {
-        if (discoverBy)
-            return items.filter((it) => DISCOVER_MAP[discoverBy]?.includes(it.creator) ?? false);
-        return items;
-    }, [items, discoverBy]);
 
-    const getCreatedTs = (it: any) => {
-        const v = it?.createdAt ?? it?.created_at ?? it?.created ?? it?.ts ?? 0;
-        const t = typeof v === 'number' ? v : new Date(v || 0).getTime();
-        return Number.isFinite(t) ? t : 0;
-    };
+    // Rely on queryKey (filter) changes to refetch; no manual refetch on sort change
 
     // --- Sorted list with stable reference ---
-    const sortedItems = useMemo(() => {
-        const arr = [...filteredItems];
-        if (sortMode === 'new') {
-            arr.sort((a, b) => {
-                const ad = getCreatedTs(a);
-                const bd = getCreatedTs(b);
-                if (bd !== ad) return bd - ad;
-                return String(a.id ?? '').localeCompare(String(b.id ?? ''));
-            });
-        } else if (sortMode === 'top') {
-            // Optionally filter by selected time range before computing score
-            const now = Date.now();
-            let cutoffMs = 0; // 0 means no cutoff (all time)
-            if (topRange === '15d') cutoffMs = 15 * 24 * 60 * 60 * 1000;
-            if (topRange === '30d') cutoffMs = 30 * 24 * 60 * 60 * 1000;
-            if (topRange === '3m') cutoffMs = 90 * 24 * 60 * 60 * 1000;
-            if (cutoffMs > 0) {
-                const minTs = now - cutoffMs;
-                for (let i = arr.length - 1; i >= 0; i--) {
-                    if (getCreatedTs(arr[i]) < minTs) arr.splice(i, 1);
-                }
-            }
-            arr.sort((a, b) => {
-                const ascore = (a.heartsCount || 0) + (a.commentsCount || 0) * 0.5;
-                const bscore = (b.heartsCount || 0) + (b.commentsCount || 0) * 0.5;
-                if (bscore !== ascore) return bscore - ascore;
-                const ad = getCreatedTs(a);
-                const bd = getCreatedTs(b);
-                if (bd !== ad) return bd - ad;
-                return String(a.id ?? '').localeCompare(String(b.id ?? ''));
-            });
-        } else {
-            const now = Date.now();
-            arr.sort((a, b) => {
-                const ad = getCreatedTs(a);
-                const bd = getCreatedTs(b);
-                const aAgeH = Math.max(1, (now - ad) / 3600000);
-                const bAgeH = Math.max(1, (now - bd) / 3600000);
-                const ahot =
-                    ((a.heartsCount || 0) + (a.commentsCount || 0) * 0.6) / Math.pow(aAgeH + 2, 1.2);
-                const bhot =
-                    ((b.heartsCount || 0) + (b.commentsCount || 0) * 0.6) / Math.pow(bAgeH + 2, 1.2);
-                if (bhot !== ahot) return bhot - ahot;
-                if (bd !== ad) return bd - ad;
-                return String(a.id ?? '').localeCompare(String(b.id ?? ''));
-            });
-        }
-
-        const key = arr.map((it) => String(it.id ?? '')).join('|');
-        if (lastOrderRef.current?.key === key) return lastOrderRef.current.arr;
-        lastOrderRef.current = { key, arr };
-        return arr;
-    }, [filteredItems, sortMode]);
+    const sortedItems = useMemo(() => items, [items]);
 
     // --- Active Item Tracking ---
     useEffect(() => {
@@ -168,6 +128,11 @@ export default function FeedScreen() {
                 onRefresh={() => {
                     query.refetch();
                 }}
+                emptyMessage={
+                    sortMode === 'hot' && query.isFetched && !isLoading && sortedItems.length === 0
+                        ? 'No hot videos right now'
+                        : undefined
+                }
             />
 
             {discoverBy && (

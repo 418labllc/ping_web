@@ -63,7 +63,7 @@ export default function Layout() {
   }
 
   return (
-    <Tabs screenOptions={{ headerShown: true, tabBarStyle: { backgroundColor: '#323232' }, header: ({ route }) => <CustomHeader title={route.name} />, }}>
+    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { backgroundColor: '#323232' }, }}>
 
       <Tabs.Screen
         name="search"
@@ -76,7 +76,6 @@ export default function Layout() {
         name="index"
         options={{
           title: 'Home',
-          headerShown: false,
           tabBarIcon: ({ color, size }: any) => <FontAwesome name="home" color={color} size={size} />,
         }}
       />
